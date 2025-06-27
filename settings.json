@@ -15,7 +15,17 @@
         "pip": [
             {
                 "source": "https://pypi.python.org/simple",
-                "packages": []
+                "packages": [
+                    {   
+                        "name": "seaborn", 
+                        "version": "0.13.2"
+                    },
+                    {
+                        "name": "econml",
+                        "version": "0.15.1"
+                    }
+
+                ]
             }
         ],
         "git": [
