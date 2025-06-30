@@ -2,9 +2,6 @@ import os
 import pandas as pd
 import numpy as np
 import re
-from typing import List, Tuple
-
-
 import matplotlib.pyplot as plt
 import seaborn as sns
 import re
@@ -14,10 +11,10 @@ from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.feature_selection import mutual_info_regression
 
-from gws_core import (Settings, BoolParam, ConfigParams, FloatParam, InputSpec,
-                      InputSpecs, IntParam, ListParam, OutputSpec, OutputSpecs, ConfigSpecs,
-                      StrParam, Table, TableConcatHelper, Task, TaskInputs,
-                      TaskOutputs, TypingStyle, task_decorator, File, Folder)
+from gws_core import (Settings, ConfigParams, InputSpec,
+                      InputSpecs, ListParam, OutputSpec, OutputSpecs, ConfigSpecs,
+                      Table, Task, TaskInputs,
+                      TaskOutputs, TypingStyle, task_decorator, Folder)
 
 
 @task_decorator("CausalEffect", human_name="Causal Effect", short_description="Causal Effect",
@@ -25,8 +22,53 @@ from gws_core import (Settings, BoolParam, ConfigParams, FloatParam, InputSpec,
                                                     background_color="#f17093"))
 class CausalEffect(Task):
     """
-    CausalEffect task class
+    CausalEffect task performs causal inference analysis to estimate the causal effects
+    of treatments on target variables using machine learning methods.
 
+    This task implements causal effect estimation using LinearDML for discrete treatments and CausalForestDML for continuous
+    treatments. It analyzes all possible combinations of the specified target variables and
+    estimates the Average Treatment Effect (ATE) for each treatment-target pair.
+
+    **What this task does:**
+    - Identifies treatment from your dataset
+    - For each treatment-target combination, estimates the causal effect using appropriate DML models
+    - Handles both discrete and continuous treatment variables
+    - Uses feature selection based on mutual information to select relevant confounders
+    - Generates results for all possible combinations of target variables
+    - Creates heatmap visualizations of causal effects
+    - Exports results as CSV files and PNG heatmaps
+
+    **Input Requirements:**
+    - **Data**: A Table containing numerical data with:
+      - At least one target variable
+      - At least one treatment variable
+      - Optional: Additional variables that serve as confounders/covariates
+      - All variables should be numerical
+      - Missing values will be handled automatically
+
+    **Configuration:**
+    - **targets**: List of column names from your data that represent target variables
+      These are the variables for which you want to measure causal effects
+
+    **Outputs:**
+    - **results_folder**: A folder containing:
+        - A subfolder for each combination of target variables
+            - Each subfolder contains:
+            - CSV file with causal effect estimates for each treatment-target pair
+            - Heatmap visualization of the causal effects for that combination
+
+
+    **Example Use Case:**
+    If you have data with variables like 'drug_dose', 'exercise_hours', 'blood_pressure', 'cholesterol'
+    and you specify targets=['blood_pressure', 'cholesterol'], the task will:
+    1. Treat 'drug_dose' and 'exercise_hours' as treatments
+    2. Estimate how each treatment affects each target
+    3. Generate results for individual targets and their combination
+    4. Create visualizations showing the strength and direction of causal effects
+
+    **Note:** The task uses sophisticated causal inference methods that account for confounding
+    variables automatically, but results should be interpreted carefully considering domain knowledge
+    and potential unmeasured confounders.
     """
 
     input_specs = InputSpecs({'data': InputSpec(Table, human_name="Data",
@@ -38,6 +80,18 @@ class CausalEffect(Task):
 
     })
 
+
+    TREATMENT_NAME = "Treatment"
+    TARGET_NAME = "Target"
+    AVERAGE_CAUSAL_EFFECT_NAME = "Average Causal Effect (CATE)"
+    TYPE_OF_TREATMENT_NAME = "Type of treatment"
+    MODEL_NAME = "Model"
+    MODEL_DISCRETE = "Discrete"
+    MODEL_CONTINUOUS = "Continuous"
+    MODEL_LINEAR_DML = "LinearDML"
+    MODEL_CAUSAL_FOREST_DML = "CausalForestDML"
+    ERROR_NAME = "Error"
+
     def run(self, params: ConfigParams, inputs: TaskInputs) -> TaskOutputs:
 
         # Load and prepare data
@@ -45,8 +99,6 @@ class CausalEffect(Task):
         df_numeric = df.select_dtypes(include='number').dropna()
 
         folder_output_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), Settings.make_temp_dir())
-
-
 
         # Define targets
         target_all = params.get('targets')
@@ -65,8 +117,8 @@ class CausalEffect(Task):
             dossier_output = os.path.join(folder_output_path, nom_combinaison)
             os.makedirs(dossier_output, exist_ok=True)
 
-            fichier_sortie = os.path.join(dossier_output, "effets_causaux.csv")
-            fichier_plot = os.path.join(dossier_output, "heatmap_effets_causaux.png")
+            fichier_sortie = os.path.join(dossier_output, "causal_effects.csv")
+            fichier_plot = os.path.join(dossier_output, "heatmap_causal_effects.png")
 
             # Préparer les données pour cette combinaison
             df_temp = df_numeric.copy()
@@ -132,18 +184,18 @@ class CausalEffect(Task):
                         avg_cate = avg_cate_scaled * scaler_Y.scale_[0]
 
                         results.append({
-                            "Traitement": T_name,
-                            "Cible": Y_name,
-                            "Effet Causal Moyen (CATE)": avg_cate,
-                            "Type de traitement": "Discret" if is_discrete else "Continu",
-                            "Modèle": "LinearDML" if is_discrete else "CausalForestDML"
+                            self.TREATMENT_NAME: T_name,
+                            self.TARGET_NAME: Y_name,
+                            self.AVERAGE_CAUSAL_EFFECT_NAME: avg_cate,
+                            self.TYPE_OF_TREATMENT_NAME: self.MODEL_DISCRETE if is_discrete else self.MODEL_CONTINUOUS,
+                            self.MODEL_NAME: self.MODEL_LINEAR_DML if is_discrete else self.MODEL_CAUSAL_FOREST_DML,
                         })
                     except Exception as e:
                         results.append({
-                            "Traitement": T_name,
-                            "Cible": Y_name,
-                            "Effet Causal Moyen (CATE)": np.nan,
-                            "Erreur": str(e)
+                            self.TREATMENT_NAME: T_name,
+                            self.TARGET_NAME: Y_name,
+                            self.AVERAGE_CAUSAL_EFFECT_NAME: np.nan,
+                            self.ERROR_NAME: str(e)
                         })
 
             # Export des résultats
@@ -151,14 +203,14 @@ class CausalEffect(Task):
             df_results.to_csv(fichier_sortie, index=False)
 
             # Génération de la heatmap
-            heatmap_data = df_results.pivot(index="Cible", columns="Traitement", values="Effet Causal Moyen (CATE)")
+            heatmap_data = df_results.pivot(index=self.TARGET_NAME, columns=self.TREATMENT_NAME, values=self.AVERAGE_CAUSAL_EFFECT_NAME)
             if not heatmap_data.empty:
                 fig_width = max(12, 0.5 * len(heatmap_data.columns))
                 plt.figure(figsize=(fig_width, 8))
                 sns.heatmap(heatmap_data, annot=True, cmap="coolwarm", center=0, fmt=".2f")
-                plt.title(f"Heatmap - Cibles: {', '.join(target_select)}")
-                plt.xlabel("Traitement")
-                plt.ylabel("Cible")
+                plt.title(f"Heatmap - {self.TARGET_NAME}s: {', '.join(target_select)}")
+                plt.xlabel(self.TREATMENT_NAME)
+                plt.ylabel(self.TARGET_NAME)
                 plt.tight_layout()
                 plt.savefig(fichier_plot, bbox_inches="tight")
                 plt.close()
