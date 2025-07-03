@@ -1,12 +1,12 @@
-from gws_core import (ConfigParams, Dashboard, DashboardType, OutputSpec,
+from gws_core import (ConfigParams, AppConfig, AppType, OutputSpec,
                       OutputSpecs, StreamlitResource, Task, TaskInputs,
-                      TaskOutputs, dashboard_decorator, task_decorator,
+                      TaskOutputs, app_decorator, task_decorator,
                       InputSpecs, ConfigSpecs, Folder, InputSpec)
 
 
-@dashboard_decorator("CausalEffectDashboardDashboard", dashboard_type=DashboardType.STREAMLIT,
-                     human_name="Generate show case app")
-class CausalEffectDashboard(Dashboard):
+@app_decorator("CausalEffectDashboardDashboard", dashboard_type=AppType.STREAMLIT,
+                     human_name="Generate AppConfig")
+class CausalEffectDashboard(AppConfig):
 
     # retrieve the path of the app folder, relative to this file
     # the dashboard code folder starts with a underscore to avoid being loaded when the brick is loaded
@@ -83,7 +83,7 @@ class GenerateCausalEffectDashboard(Task):
         folder: Folder = inputs.get('folder')
         streamlit_app.add_resource(folder, create_new_resource=False)
 
-        streamlit_app.set_dashboard(CausalEffectDashboard())
+        streamlit_app.set_app_config(CausalEffectDashboard())
         streamlit_app.name = "Dashboard of Conditional Average Treatment Effect (CATE)"
 
         return {"streamlit_app": streamlit_app}
