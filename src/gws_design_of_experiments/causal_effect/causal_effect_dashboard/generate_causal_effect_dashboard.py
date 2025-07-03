@@ -4,8 +4,8 @@ from gws_core import (ConfigParams, AppConfig, AppType, OutputSpec,
                       InputSpecs, ConfigSpecs, Folder, InputSpec)
 
 
-@app_decorator("CausalEffectDashboardDashboard", dashboard_type=AppType.STREAMLIT,
-                     human_name="Generate AppConfig")
+@app_decorator("CausalEffectDashboardDashboard", app_type=AppType.STREAMLIT,
+               human_name="Generate AppConfig")
 class CausalEffectDashboard(AppConfig):
 
     # retrieve the path of the app folder, relative to this file
@@ -67,7 +67,7 @@ class GenerateCausalEffectDashboard(Task):
 
     """
 
-    input_specs = InputSpecs({'folder' : InputSpec(Folder)})
+    input_specs = InputSpecs({'folder': InputSpec(Folder)})
     output_specs = OutputSpecs({
         'streamlit_app': OutputSpec(StreamlitResource)
     })

@@ -4,7 +4,6 @@ import numpy as np
 import re
 import matplotlib.pyplot as plt
 import seaborn as sns
-import re
 import itertools
 from econml.dml import CausalForestDML, LinearDML
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
@@ -19,7 +18,7 @@ from gws_core import (Settings, ConfigParams, InputSpec,
 
 @task_decorator("CausalEffect", human_name="Causal Effect", short_description="Causal Effect",
                 style=TypingStyle.material_icon(material_icon_name="gradient",
-                                                    background_color="#f17093"))
+                                                background_color="#f17093"))
 class CausalEffect(Task):
     """
     CausalEffect task performs causal inference analysis to estimate the causal effects
@@ -74,12 +73,9 @@ class CausalEffect(Task):
     input_specs = InputSpecs({'data': InputSpec(Table, human_name="Data",
                              short_description="Data",)})
     config_specs = ConfigSpecs({
-        'targets': ListParam(human_name= "Target(s)", short_description="Target(s)",)})
-    output_specs = OutputSpecs({
-        'results_folder': OutputSpec(Folder, human_name="Results folder", short_description="The folder containing the results"),
-
-    })
-
+        'targets': ListParam(human_name="Target(s)", short_description="Target(s)",)})
+    output_specs = OutputSpecs({'results_folder': OutputSpec(
+        Folder, human_name="Results folder", short_description="The folder containing the results"), })
 
     TREATMENT_NAME = "Treatment"
     TARGET_NAME = "Target"
@@ -170,7 +166,9 @@ class CausalEffect(Task):
                     Y_scaled = scaler_Y.fit_transform(Y.reshape(-1, 1)).ravel()
 
                     try:
-                        model_t = RandomForestClassifier(n_estimators=100) if is_discrete else RandomForestRegressor(n_estimators=100)
+                        model_t = RandomForestClassifier(
+                            n_estimators=100) if is_discrete else RandomForestRegressor(
+                            n_estimators=100)
                         model = (LinearDML if is_discrete else CausalForestDML)(
                             model_y=RandomForestRegressor(n_estimators=100),
                             model_t=model_t,
@@ -203,7 +201,8 @@ class CausalEffect(Task):
             df_results.to_csv(fichier_sortie, index=False)
 
             # Génération de la heatmap
-            heatmap_data = df_results.pivot(index=self.TARGET_NAME, columns=self.TREATMENT_NAME, values=self.AVERAGE_CAUSAL_EFFECT_NAME)
+            heatmap_data = df_results.pivot(
+                index=self.TARGET_NAME, columns=self.TREATMENT_NAME, values=self.AVERAGE_CAUSAL_EFFECT_NAME)
             if not heatmap_data.empty:
                 fig_width = max(12, 0.5 * len(heatmap_data.columns))
                 plt.figure(figsize=(fig_width, 8))
@@ -220,4 +219,3 @@ class CausalEffect(Task):
         return {
             'results_folder': folder_results,
         }
-
