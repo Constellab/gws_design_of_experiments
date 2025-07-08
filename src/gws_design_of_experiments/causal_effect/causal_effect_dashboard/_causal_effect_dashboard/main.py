@@ -1,7 +1,7 @@
 
 
 import streamlit as st
-from pages import first_page
+from pages import visualisation_page
 
 sources: list
 params: dict
@@ -14,7 +14,7 @@ if sources :
     folder_results = sources[0].path
 
 def _render_first_page():
-    first_page.render_first_page(folder_results)
+    visualisation_page.render_first_page(folder_results)
 
 
 _first_page = st.Page(_render_first_page, title='First page', url_path='first-page', icon='📦')
