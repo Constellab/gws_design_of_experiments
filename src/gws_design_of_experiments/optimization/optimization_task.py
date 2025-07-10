@@ -28,7 +28,7 @@ import multiprocessing
 
 from gws_core import (ConfigParams, InputSpec, InputSpecs, OutputSpec,
                       OutputSpecs, Task, TaskInputs, TaskOutputs, ListParam,
-                      task_decorator, ConfigSpecs, TypingStyle, Table, Folder, JSONDict)
+                      task_decorator, ConfigSpecs, TypingStyle, Table, Folder, JSONDict, ParamSet, StrParam, IntParam)
 
 
 @task_decorator("Optimization", human_name="Optimization", short_description="Optimization",
@@ -73,12 +73,13 @@ class Optimization(Task):
     """
 
     input_specs = InputSpecs({'data': InputSpec(Table, human_name="Data", short_description="Data",),
-                            'targets_thresholds': InputSpec(JSONDict, human_name="Targets thresholds",
-                            short_description="Thresholds for optimization targets",),
                             'manual_constraints': InputSpec(JSONDict, human_name="Manual constraints",
                             short_description="Manual constraints for optimization")})
     config_specs = ConfigSpecs({
-        'targets': ListParam(human_name="Target(s)", short_description="Target(s)")})
+        'targets_thresholds': ParamSet(ConfigSpecs({
+            'targets': StrParam(default_value=None, optional=False, human_name="Target", short_description="Target to optimize"),
+            'thresholds': IntParam(default_value=None, optional=False, human_name="Threshold", short_description="Threshold value for the target"),
+        }), optional=False, human_name="Targets with thresholds", short_description="Targets to optimize and their threshold values"),})
 
     output_specs = OutputSpecs({'results_folder': OutputSpec(
         Folder, human_name="Results folder", short_description="The folder containing the results"), })
@@ -89,14 +90,15 @@ class Optimization(Task):
         ## Get inputs
         data_filtered = inputs["data"].get_data()
         # Full threshold dictionary
-        full_thresholds = inputs["targets_thresholds"].get_data()
+        full_thresholds = {target['targets']: target['thresholds'] for target in params.get("targets_thresholds")}
+
         #Manual constraints
         manual_constraints = inputs["manual_constraints"].get_data()
 
         columns_data = data_filtered.columns.tolist()
         manual_constraints_name = list(manual_constraints.keys())
         # Define targets
-        optimization_targets = params.get('targets')
+        optimization_targets = list(full_thresholds.keys())
         optimization_targets_all = [col for col in columns_data if col not in manual_constraints_name]
 
         # Filter thresholds for selected targets
