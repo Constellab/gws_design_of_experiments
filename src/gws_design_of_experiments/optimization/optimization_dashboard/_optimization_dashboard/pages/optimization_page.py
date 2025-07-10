@@ -30,14 +30,47 @@ def render_first_page(path_output_dir : str):
         ]
     )
 
+    # -----------------------------------------------------------------------------
+    # --- Best Solution -------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     with best_solution:
         file_path_best = os.path.join(path_output_dir, "best_generalized_solution.csv")
-        col_tab, col_empty = st.columns([1, 3])
+        col_tab, col_plots = st.columns([1, 1])
+
         with col_tab:
-            df_best = pd.read_csv(file_path_best).transpose()
-            df_best.columns = ["Optimal values"]
-            df_best.index.name = "Parameters"
-            st.dataframe(df_best, use_container_width=True)
+            df_best = pd.read_csv(file_path_best)
+
+            # Calculate statistics for parameters
+            stats_data = []
+            for param in df.columns:
+                mean_val = df[param].mean()
+                std_val = df[param].std()
+                optimal_val = df_best[param].iloc[0]
+
+
+                stats_data.append({
+                    'Parameters': param,
+                    'Mean Value': safe_round(mean_val),
+                    'Standard Deviation': safe_round(std_val),
+                    'Optimal Value': safe_round(optimal_val)
+                })
+
+            df_stats = pd.DataFrame(stats_data)
+            st.dataframe(df_stats, use_container_width=True, hide_index=True)
+
+        with col_plots:
+            # Multiselect for choosing parameters to plot
+            available_params = [row['Parameters'] for row in stats_data]
+            selected_params = st.selectbox(
+                "Select parameter for boxplot:",
+                options=available_params, index = 0
+            )
+
+            # Create boxplot for selected parameter
+            if selected_params and selected_params in df.columns:
+                fig = px.box(df, y=selected_params, title=f"Distribution of {selected_params}")
+                fig.update_layout(height=400, margin=dict(l=0, r=0, t=30, b=0))
+                st.plotly_chart(fig, use_container_width=True)
 
     # -----------------------------------------------------------------------------
     # --- 3D Surface Explorer ------------------------------------------------------
@@ -208,3 +241,11 @@ def render_first_page(path_output_dir : str):
             f"Data are sorted by **{sort_col}** ({order} order)."
             )
 
+# Handle rounding for different data types
+def safe_round(val, decimals=4):
+    if isinstance(val, (bool, np.bool_)):
+        return val
+    try:
+        return round(val, decimals)
+    except (TypeError, AttributeError):
+        return val
