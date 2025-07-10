@@ -22,7 +22,7 @@ def render_first_page(path_output_dir : str):
 
 
     best_solution, surface_explorer, feature_importance_matrix, observed_vs_predicted, data_explorer = st.tabs(
-        [   "✅ Summary Best Solution",
+        [   "✅ Optimal Solution",
             "📊 3D Surface Explorer",
             "📈 Feature Importance Matrix",
             "🔍 Observed vs Predicted",
@@ -32,16 +32,17 @@ def render_first_page(path_output_dir : str):
 
     with best_solution:
         file_path_best = os.path.join(path_output_dir, "best_generalized_solution.csv")
-
-        df_best = pd.read_csv(file_path_best)
-        st.write("✅ Best solution:")
-        st.dataframe(df_best, use_container_width=True)
+        col_tab, col_empty = st.columns([1, 3])
+        with col_tab:
+            df_best = pd.read_csv(file_path_best).transpose()
+            df_best.columns = ["Optimal values"]
+            df_best.index.name = "Parameters"
+            st.dataframe(df_best, use_container_width=True)
 
     # -----------------------------------------------------------------------------
     # --- 3D Surface Explorer ------------------------------------------------------
     # -----------------------------------------------------------------------------
     with surface_explorer:
-        st.title("📊 3D Surface Explorer (Polynomial Fit)")
         cols = st.columns(3)
         with cols[0]:
             x_col = st.selectbox("X Axis", numeric_cols, index=0)
@@ -94,7 +95,6 @@ def render_first_page(path_output_dir : str):
     # --- Observed vs Predicted ----------------------------------------------------
     # -----------------------------------------------------------------------------
     with observed_vs_predicted:
-        st.title("🔍 Observed vs Predicted")
 
         pred_file = os.path.join(path_output_dir, "actual_vs_predicted.csv")
         if not os.path.exists(pred_file):
@@ -138,7 +138,6 @@ def render_first_page(path_output_dir : str):
     # --- Feature Importance Matrix -----------------------------------------------
     # -----------------------------------------------------------------------------
     with feature_importance_matrix:
-        st.title("📈 Feature Importance Visualization")
 
         importance_file = os.path.join(path_output_dir, "feature_importance_matrix.csv")
         if not os.path.exists(importance_file):
@@ -184,7 +183,6 @@ def render_first_page(path_output_dir : str):
     # --- Data Explorer --------------------------------------------------
     # -----------------------------------------------------------------------------
     with data_explorer:
-        st.title("🗂️ Data Explorer")
 
         # --- Sorting options ------------------------------------------------------
         cols = st.columns(2)

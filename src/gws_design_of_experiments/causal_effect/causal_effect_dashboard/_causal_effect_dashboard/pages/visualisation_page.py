@@ -80,16 +80,14 @@ def render_first_page(folder_results: str):
 
     # --- HEATMAP ---
     with tab1:
-
         pivot = df_filtre.pivot(index=f"{CausalEffect.TARGET_NAME}_Combo", columns=CausalEffect.TREATMENT_NAME, values=CausalEffect.AVERAGE_CAUSAL_EFFECT_NAME)
         fig = px.imshow(
             pivot,
-            text_auto=".2f",
             color_continuous_scale="RdBu",
             zmin=-pivot.abs().max().max(),
             zmax=pivot.abs().max().max(),
             aspect="auto",
-            labels=dict(color="CATE")
+            labels=dict(color="Effect (log scale)"),
         )
         fig.update_layout(title="Conditional Average Treatment Effect (CATE)", xaxis_title=CausalEffect.TREATMENT_NAME, yaxis_title="Target + Combinaison")
         st.plotly_chart(fig, use_container_width=True)
@@ -103,7 +101,7 @@ def render_first_page(folder_results: str):
             color=f"{CausalEffect.TARGET_NAME}_Combo",
             barmode="group",
             title="CATE by treatment and target",
-            labels={CausalEffect.AVERAGE_CAUSAL_EFFECT_NAME: "Conditional Average Treatment Effect"},
+            labels={CausalEffect.AVERAGE_CAUSAL_EFFECT_NAME: "Effect (log scale)"},
         )
         fig.update_layout(xaxis_tickangle=-45)
         st.plotly_chart(fig, use_container_width=True)
@@ -111,6 +109,5 @@ def render_first_page(folder_results: str):
     # --- CLUSTERMAP ---
     with tab3:
         pivot = df_filtre.pivot(index=f"{CausalEffect.TARGET_NAME}_Combo", columns=CausalEffect.TREATMENT_NAME, values=CausalEffect.AVERAGE_CAUSAL_EFFECT_NAME).fillna(0)
-        fig = sns.clustermap(pivot, cmap="coolwarm", center=0, figsize=(14, 12), annot=True, fmt=".2f")
+        fig = sns.clustermap(pivot, cmap="coolwarm", center=0, figsize=(14, 12))
         st.pyplot(fig.figure)
-
