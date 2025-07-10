@@ -76,10 +76,13 @@ class Optimization(Task):
                             'manual_constraints': InputSpec(JSONDict, human_name="Manual constraints",
                             short_description="Manual constraints for optimization")})
     config_specs = ConfigSpecs({
+        'population_size': IntParam(default_value=500, optional=False, human_name="Population size", short_description="Population size for the optimization algorithm"),
+        'iterations': IntParam(default_value=100, optional=False, human_name="Iterations"),
         'targets_thresholds': ParamSet(ConfigSpecs({
             'targets': StrParam(default_value=None, optional=False, human_name="Target", short_description="Target to optimize"),
-            'thresholds': IntParam(default_value=None, optional=False, human_name="Threshold", short_description="Threshold value for the target"),
-        }), optional=False, human_name="Targets with thresholds", short_description="Targets to optimize and their threshold values"),})
+            'thresholds': IntParam(default_value=None, optional=False, human_name="Objective", short_description="Objective value for the target"),
+        }), optional=False, human_name="Targets with objectives", short_description="Targets to optimize and their objective values")
+        })
 
     output_specs = OutputSpecs({'results_folder': OutputSpec(
         Folder, human_name="Results folder", short_description="The folder containing the results"), })
@@ -92,6 +95,9 @@ class Optimization(Task):
         # Full threshold dictionary
         full_thresholds = {target['targets']: target['thresholds'] for target in params.get("targets_thresholds")}
 
+        # Get parameters
+        population_size = params.get("population_size")
+        iterations = params.get("iterations")
         #Manual constraints
         manual_constraints = inputs["manual_constraints"].get_data()
 
@@ -191,17 +197,17 @@ class Optimization(Task):
         )
 
         if len(optimization_targets) == 1 and not add_cv_as_penalty:
-            algorithm = GA(pop_size=300)
-            termination = get_termination("n_gen", 100)
+            algorithm = GA(pop_size=population_size)
+            termination = get_termination("n_gen", iterations)
         else:
             algorithm = NSGA2(
-                pop_size=500,
+                pop_size=population_size,
                 sampling=LHS(),
                 crossover=SBX(prob=0.95, eta=3),
                 mutation=PM(eta=3),
                 eliminate_duplicates=True
             )
-            termination = get_termination("n_gen", 100)
+            termination = get_termination("n_gen", iterations)
 
         res = minimize(problem, algorithm, termination, seed=42, verbose=True, callback=MyCallback(output_dir =output_dir, save_every=10))
         pool.close()
