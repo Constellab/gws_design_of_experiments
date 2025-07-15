@@ -219,17 +219,17 @@ class Optimization(Task):
             for i, t in enumerate(optimization_targets):
                 df_resultats[t] = -res.F[:, i]
 
-            df_resultats['CV_percent'] = df_resultats['CV'] / sum(full_thresholds.values())
+            df_resultats['CV_percent'] = (df_resultats['CV'] / sum(full_thresholds.values()))*100
             # Drop CV column
             df_resultats = df_resultats.drop(columns=['CV'])
 
             for target in optimization_targets:
                 if target in full_thresholds:
-                    df_resultats[target + '_optimized'] = df_resultats[target] / full_thresholds[target]
+                    df_resultats[target + '_optimized'] = (df_resultats[target] / full_thresholds[target])*100
 
 
             df_resultats.to_csv(os.path.join(output_dir, "generalized_solutions.csv"), index=False)
-            df_best = df_resultats.sort_values(by=['CV'] + optimization_targets, ascending=[False] + [False]*len(optimization_targets)).iloc[[0]]
+            df_best = df_resultats.sort_values(by=['CV_percent'] + optimization_targets, ascending=[False] + [False]*len(optimization_targets)).iloc[[0]]
             df_best.to_csv(os.path.join(output_dir, "best_generalized_solution.csv"), index=False)
 
 

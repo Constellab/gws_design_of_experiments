@@ -220,7 +220,7 @@ def render_first_page(path_output_dir : str):
         # --- Sorting options ------------------------------------------------------
         cols = st.columns(2)
         with cols[0]:
-            default_col = "CV" if "CV" in df.columns else df.columns[0]
+            default_col = 'CV_percent' if 'CV_percent' in df.columns else df.columns[0]
             sort_col = st.selectbox("Sort by column:", df.columns.tolist(), index=df.columns.tolist().index(default_col))
         with cols[1]:
             order = st.selectbox("Order:", ("Descending", "Ascending"), index=0)
