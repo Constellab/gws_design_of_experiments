@@ -223,7 +223,7 @@ def render_first_page(path_output_dir : str):
             default_col = "CV" if "CV" in df.columns else df.columns[0]
             sort_col = st.selectbox("Sort by column:", df.columns.tolist(), index=df.columns.tolist().index(default_col))
         with cols[1]:
-            order = st.selectbox("Order:", ("Ascending", "Descending"), index=0)
+            order = st.selectbox("Order:", ("Descending", "Ascending"), index=0)
             if order == "Ascending":
                 is_ascending = True
             else:
