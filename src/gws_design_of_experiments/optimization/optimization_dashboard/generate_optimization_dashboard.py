@@ -65,6 +65,6 @@ class GenerateOptimizationDashboard(Task):
         streamlit_app.add_resource(folder, create_new_resource=False)
 
         streamlit_app.set_app_config(OptimizationDashboardAppConfig())
-        streamlit_app.name = "OptimizationDashboard"
+        streamlit_app.name = "Optimization Dashboard"
 
         return {"streamlit_app": streamlit_app}
