@@ -52,7 +52,12 @@ def show_sidebar():
     with st.sidebar:
         # 1. Combinaisons
         combinaisons = sorted(df_all["Combinaison"].unique())
-        st.selectbox("Combinations of targets", options = combinaisons, index=0, key="combinations_selectbox")
+        # Map combinations to display names
+        display_combinaisons = [CausalEffectState.get_display_name(combo) for combo in combinaisons]
+        selected_display = st.selectbox("Combinations of targets", options=display_combinaisons, index=0, key="combinations_selectbox_display")
+        # Find the original combination name
+        selected_combo = combinaisons[display_combinaisons.index(selected_display)] if selected_display in display_combinaisons else combinaisons[0]
+        st.session_state["combinations_selectbox"] = selected_combo
 
     # 2. Traitements - auto-désélection de ceux à 0
     df_temp = df_all[df_all["Combinaison"]== CausalEffectState.get_combinations()]
@@ -81,15 +86,21 @@ if sources:
     router = StreamlitRouter.load_from_session()
     folder_results = sources[0].path
 
+    CausalEffectState.set_input_folder(folder_results)
+    CausalEffectState.load_settings()  # Load settings at startup
+
     df_all = load_data(folder_results)
     show_sidebar()
 
-    _single_effect_page = st.Page(_render_single_effect_page, title='Single effect', url_path='single-effect-page', icon='📈')
-    pages = {'Single effect': [_single_effect_page]}
+    pages = {}
 
     if "_" in CausalEffectState.get_combinations():
         _multiple_effect_page = st.Page(_render_multiple_effect_page, title='Multiple effect', url_path='multiple-effect-page', icon='📊')
         pages['Multiple effect'] = [_multiple_effect_page]
+    else:
+        _single_effect_page = st.Page(_render_single_effect_page, title='Single effect', url_path='single-effect-page', icon='📈')
+        pages['Single effect'] = [_single_effect_page]
+
 
     _settings_page = st.Page(_render_settings_page, title='Settings', url_path='settings', icon='⚙️')
     pages['Settings'] = [_settings_page]

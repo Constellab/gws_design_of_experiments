@@ -1,8 +1,9 @@
+import os
+import json
 from gws_core import (ConfigParams, AppConfig, AppType, OutputSpec,
                       OutputSpecs, StreamlitResource, Task, TaskInputs,
                       TaskOutputs, app_decorator, task_decorator,
                       InputSpecs, ConfigSpecs, Folder, InputSpec)
-
 
 @app_decorator("CausalEffectDashboardDashboard", app_type=AppType.STREAMLIT,
                human_name="Generate AppConfig")
@@ -81,6 +82,21 @@ class GenerateCausalEffectDashboard(Task):
 
         # set the input in the streamlit resource
         folder: Folder = inputs.get('folder')
+
+        # Create settings.json if it doesn't exist
+        settings_path = os.path.join(folder.path, "settings.json")
+        if not os.path.exists(settings_path):
+            # Get all subdirectories in the folder
+            subfolders = [name for name in os.listdir(folder.path)
+                         if os.path.isdir(os.path.join(folder.path, name))]
+
+            # Create settings dictionary with subfolder names as keys and values
+            settings = {subfolder: subfolder for subfolder in subfolders}
+
+            # Write settings.json file
+            with open(settings_path, 'w') as f:
+                json.dump(settings, f, indent=2)
+
         streamlit_app.add_resource(folder, create_new_resource=False)
 
         streamlit_app.set_app_config(CausalEffectDashboard())

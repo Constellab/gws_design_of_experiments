@@ -6,21 +6,12 @@ import seaborn as sns
 import numpy as np
 from gws_design_of_experiments.causal_effect.causal_effect_task import CausalEffect
 from gws_design_of_experiments.causal_effect.causal_effect_dashboard._causal_effect_dashboard.causal_effect_state import CausalEffectState
-
+from gws_design_of_experiments.causal_effect.causal_effect_dashboard._causal_effect_dashboard.plot_functions import display_barplot
 
 
 def render_single_effect_page():
 
     # --- BARPLOT ---
-
-    fig = px.bar(
-        CausalEffectState.get_df_filtered(),
-        x=CausalEffect.TREATMENT_NAME,
-        y=CausalEffect.AVERAGE_CAUSAL_EFFECT_NAME,
-        color=f"{CausalEffect.TARGET_NAME}_Combo",
-        barmode="group",
-        title="CATE by treatment and target",
-        labels={CausalEffect.AVERAGE_CAUSAL_EFFECT_NAME: "Effect (log scale)"},
-    )
-    fig.update_layout(xaxis_tickangle=-45)
-    st.plotly_chart(fig, use_container_width=True)
+    # Get the filtered data and sort treatments by absolute effect values
+    df_filtered = CausalEffectState.get_df_filtered()
+    display_barplot(df_filtered, thresholds=True)

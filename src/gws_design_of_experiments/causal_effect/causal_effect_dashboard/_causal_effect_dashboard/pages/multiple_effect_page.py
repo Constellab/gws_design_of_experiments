@@ -6,32 +6,42 @@ import seaborn as sns
 import numpy as np
 from gws_design_of_experiments.causal_effect.causal_effect_task import CausalEffect
 from gws_design_of_experiments.causal_effect.causal_effect_dashboard._causal_effect_dashboard.causal_effect_state import CausalEffectState
-
+from gws_design_of_experiments.causal_effect.causal_effect_dashboard._causal_effect_dashboard.plot_functions import display_barplot
 
 def render_multiple_effect_page():
 
     # --- Tabs d'affichage ---
     tab_clustermap, tab_barplot= st.tabs(["🧩 Clustermap", "📊 Barplot"])
 
+    df_filtered = CausalEffectState.get_df_filtered()
+
     # --- HEATMAP ---
     with tab_clustermap:
-        # TODO : Add a warning if target is only one -> can't do the plot
-        pivot = CausalEffectState.get_df_filtered().pivot(index=f"{CausalEffect.TARGET_NAME}_Combo", columns=CausalEffect.TREATMENT_NAME, values=CausalEffect.AVERAGE_CAUSAL_EFFECT_NAME).fillna(0)
-        fig = sns.clustermap(pivot, cmap="coolwarm", center=0, figsize=(14, 12))
+        # Create display version of the data
+        df_display = df_filtered.copy()
+        df_display[CausalEffect.TREATMENT_NAME + "_Display"] = df_display[CausalEffect.TREATMENT_NAME].apply(CausalEffectState.get_display_name)
+        df_display[f"{CausalEffect.TARGET_NAME}_Combo_Display"] = df_display[f"{CausalEffect.TARGET_NAME}_Combo"].apply(
+            lambda x: CausalEffectState.get_display_name(x.split(" [")[0]) + " [" + CausalEffectState.get_display_name(x.split(" [")[1].rstrip("]")) + "]"
+        )
+        
+        pivot = df_display.pivot(index=f"{CausalEffect.TARGET_NAME}_Combo_Display", columns=CausalEffect.TREATMENT_NAME + "_Display", values=CausalEffect.AVERAGE_CAUSAL_EFFECT_NAME).fillna(0)
+        fig = sns.clustermap(pivot, cmap="coolwarm", center=0, figsize=(14, 8))
         st.pyplot(fig.figure)
 
+        # Get the column order from the clustermap (display names)
+        clustermap_column_order_display = fig.data2d.columns.tolist()
+        # Convert back to original names for the barplot function
+        clustermap_column_order = []
+        for display_name in clustermap_column_order_display:
+            # Find original name that corresponds to this display name
+            for original, display in CausalEffectState.get_settings().items():
+                if display == display_name:
+                    clustermap_column_order.append(original)
+                    break
+            else:
+                clustermap_column_order.append(display_name)  # fallback
 
     # --- BARPLOT ---
     with tab_barplot:
-        fig = px.bar(
-            CausalEffectState.get_df_filtered(),
-            x=CausalEffect.TREATMENT_NAME,
-            y=CausalEffect.AVERAGE_CAUSAL_EFFECT_NAME,
-            color=f"{CausalEffect.TARGET_NAME}_Combo",
-            barmode="group",
-            title="CATE by treatment and target",
-            labels={CausalEffect.AVERAGE_CAUSAL_EFFECT_NAME: "Effect (log scale)"},
-        )
-        fig.update_layout(xaxis_tickangle=-45)
-        st.plotly_chart(fig, use_container_width=True)
+        display_barplot(df_filtered, thresholds=True, treatment_order=clustermap_column_order)
 
