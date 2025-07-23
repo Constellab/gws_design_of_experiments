@@ -35,27 +35,30 @@ def render_first_page(path_output_dir : str):
     # -----------------------------------------------------------------------------
     with best_solution:
         file_path_best = os.path.join(path_output_dir, "best_generalized_solution.csv")
-        col_tab, col_plots = st.columns([1, 1])
+        col_tab, col_plots = st.columns([2, 1])
 
         with col_tab:
             df_best = pd.read_csv(file_path_best)
+            df_top_10 = df.sort_values(by="CV_percent", ascending=False).head(10)
 
             # Calculate statistics for parameters
             stats_data = []
-            for param in df.columns:
-                mean_val = df[param].mean()
-                std_val = df[param].std()
+            for param in df_top_10.columns:
+
+                mean_val = df_top_10[param].mean()
+                std_val = df_top_10[param].std()
                 optimal_val = df_best[param].iloc[0]
 
 
                 stats_data.append({
                     'Parameters': param,
-                    'Mean Value': safe_round(mean_val),
-                    'Standard Deviation': safe_round(std_val),
-                    'Optimal Value': safe_round(optimal_val)
+                    'Mean': safe_round(mean_val),
+                    'Std': safe_round(std_val),
+                    'Optimal value': safe_round(optimal_val)
                 })
 
             df_stats = pd.DataFrame(stats_data)
+            st.write("Mean is calculated on the top 10 solutions as well as standard deviation. Optimal value is the value of the parameter in the best solution.")
             st.dataframe(df_stats, use_container_width=True, hide_index=True)
 
         with col_plots:
