@@ -225,7 +225,7 @@ class Optimization(Task):
 
             for target in optimization_targets:
                 if target in full_thresholds:
-                    df_resultats[target + '_optimized'] = (df_resultats[target] / full_thresholds[target])*100
+                    df_resultats[target + '_percent'] = (df_resultats[target] / full_thresholds[target])*100
 
 
             df_resultats.to_csv(os.path.join(output_dir, "generalized_solutions.csv"), index=False)
