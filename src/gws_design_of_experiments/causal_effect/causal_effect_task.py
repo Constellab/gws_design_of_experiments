@@ -104,9 +104,18 @@ class CausalEffect(Task):
         for r in range(1, len(target_all) + 1):
             combinations.extend(itertools.combinations(target_all, r))
 
+        # Calculate total progress steps
+        total_combinations = len(combinations)
+        self.update_progress_value(5, message="Preparing data and combinations")
+
         # Boucle sur chaque combinaison de cibles
         for idx, target_subset in enumerate(combinations):
             target_select = list(target_subset)
+
+            # Update progress for combination
+            combination_progress = 5 + ((idx / total_combinations) * 90)
+            self.update_progress_value(combination_progress, 
+                                     message=f"Processing combination {idx+1}/{total_combinations}: {', '.join(target_select)}")
 
             # Créer le dossier de sortie
             nom_combinaison = "_".join([re.sub(r'\W+', '', t) for t in target_select])
@@ -129,6 +138,10 @@ class CausalEffect(Task):
             treatment_vars = [col for col in df_temp.columns if col not in target_vars]
 
             results = []
+            
+            # Calculate total treatment-target pairs for this combination
+            total_pairs = len(treatment_vars) * len(target_vars)
+            current_pair = 0
 
             for T_name in treatment_vars:
                 if T_name not in df_temp.columns:
@@ -155,6 +168,13 @@ class CausalEffect(Task):
                     X_scaled = StandardScaler().fit_transform(X_selected)
 
                 for Y_name in target_vars:
+                    current_pair += 1
+                    pair_progress_within_combination = (current_pair / total_pairs) * (90 / total_combinations)
+                    total_progress = combination_progress + pair_progress_within_combination
+                    
+                    self.update_progress_value(total_progress, 
+                                             message=f"Analyzing {T_name} → {Y_name} (pair {current_pair}/{total_pairs})")
+
                     if Y_name not in df_temp.columns:
                         continue
 
@@ -213,6 +233,8 @@ class CausalEffect(Task):
                 plt.tight_layout()
                 plt.savefig(fichier_plot, bbox_inches="tight")
                 plt.close()
+
+        self.update_progress_value(100, message="Causal effect analysis completed")
 
         folder_results = Folder(folder_output_path)
         folder_results.name = "Causal Effects Results"

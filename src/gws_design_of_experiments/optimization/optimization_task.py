@@ -136,6 +136,9 @@ class Optimization(Task):
         scorer = make_scorer(lambda y_true, y_pred: r2_score(y_true, y_pred, multioutput='uniform_average'))
         pipelines = []
 
+        self.update_progress_value(5, message="Preparing data and models")
+
+        self.update_progress_value(10, message="Optimizing RandomForest model")
         pipelines = self.optimize_model("RandomForest", RandomForestRegressor(random_state=42), {
             'n_estimators': [100, 200, 400],
             'max_depth': [5, 10, None],
@@ -144,16 +147,19 @@ class Optimization(Task):
             'max_features': ['sqrt']
         },scorer, X, Y, kf, pipelines)
 
+        self.update_progress_value(25, message="Optimizing XGBoost model")
         pipelines = self.optimize_model("XGBoost", XGBRegressor(random_state=42), {
             'n_estimators': [100, 200, 300],
             'learning_rate': [0.01, 0.05, 0.2]
         },scorer, X, Y, kf, pipelines)
 
+        self.update_progress_value(40, message="Optimizing CatBoost model")
         pipelines = self.optimize_model("CatBoost", CatBoostRegressor(random_seed=42, verbose=0), {
             'iterations': [100, 200, 300],
             'learning_rate': [0.01, 0.05, 0.2]
         },scorer, X, Y, kf, pipelines)
 
+        self.update_progress_value(55, message="Selecting best model and preparing optimization")
         best_score, pipeline, model_name = max(pipelines, key=lambda x: x[0])
         pipeline.fit(X, Y)
 
@@ -209,10 +215,12 @@ class Optimization(Task):
             )
             termination = get_termination("n_gen", iterations)
 
-        res = minimize(problem, algorithm, termination, seed=42, verbose=True, callback=MyCallback(output_dir =output_dir, save_every=10))
+        self.update_progress_value(65, message="Starting optimization algorithm")
+        res = minimize(problem, algorithm, termination, seed=42, verbose=True, callback=MyCallback(output_dir=output_dir, save_every=10, task=self, iterations=iterations))
         pool.close()
         pool.join()
 
+        self.update_progress_value(95, message="Saving optimization results")
         if res.F is not None and len(res.F) > 0:
             df_resultats = pd.DataFrame(res.X, columns=X.columns)
             df_resultats['CV'] = res.F[:, -1]
@@ -232,6 +240,8 @@ class Optimization(Task):
             df_best = df_resultats.sort_values(by=['CV_percent'] + optimization_targets, ascending=[False] + [False]*len(optimization_targets)).iloc[[0]]
             df_best.to_csv(os.path.join(output_dir, "best_generalized_solution.csv"), index=False)
 
+
+        self.update_progress_value(100, message="Optimization completed")
 
         folder_results = Folder(output_dir)
         folder_results.name = "Optimization Results"
@@ -278,16 +288,24 @@ class MilieuOptimizationProblem(ElementwiseProblem):
 
 
 class MyCallback(Callback):
-    def __init__(self, output_dir: str, save_every=50):
+    def __init__(self, output_dir: str, save_every=50, task=None, iterations=None):
         super().__init__()
         self.save_every = save_every
         self.history = []
         self.output_dir = output_dir
+        self.task = task
+        self.iterations = iterations
 
     def notify(self, algorithm):
         F = algorithm.pop.get("F")
         best_cv = F[:, -1].min()
         gen = algorithm.n_gen
         self.history.append({"generation": gen, "best_cv": best_cv})
+        
+        # Update progress during optimization
+        if self.task and self.iterations:
+            progress = 65 + (gen / self.iterations) * 30  # 65% to 95% for optimization
+            self.task.update_progress_value(progress, message=f"Optimization generation {gen}/{self.iterations}")
+        
         if gen % self.save_every == 0:
             pd.DataFrame(self.history).to_csv(os.path.join(self.output_dir, "optimization_progress.csv"), index=False)
