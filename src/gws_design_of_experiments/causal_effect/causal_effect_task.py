@@ -9,7 +9,7 @@ from gws_core import (ConfigParams, ConfigSpecs, Folder, InputSpec, InputSpecs,
 from .econml_env_helper import EconmlEnvHelper
 
 
-@task_decorator("CausalEffect2", human_name="Causal Effect2", short_description="Causal Effect",
+@task_decorator("CausalEffect", human_name="Causal Effect", short_description="Causal Effect",
                 style=TypingStyle.material_icon(material_icon_name="gradient",
                                                 background_color="#f17093"))
 class CausalEffect(Task):
@@ -117,7 +117,7 @@ class CausalEffect(Task):
 
         # Run the complete analysis in virtual environment
         cmd = ["python", script_path, input_file, output_folder]
-        result_code = shell_proxy.run(cmd)
+        result_code = shell_proxy.run(cmd, dispatch_stderr=True, dispatch_stdout=True)
 
         if result_code != 0:
             self.log_error_message("Failed to run causal analysis in virtual environment")

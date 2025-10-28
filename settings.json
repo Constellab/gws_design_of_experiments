@@ -19,18 +19,6 @@
                     {
                         "name": "seaborn",
                         "version": "0.13.2"
-                    },
-                    {
-                        "name": "xgboost",
-                        "version": "3.0.2"
-                    },
-                    {
-                        "name": "catboost",
-                        "version": "1.2.8"
-                    },
-                    {
-                        "name": "pymoo",
-                        "version": "0.6.1.5"
                     }
                 ]
             }

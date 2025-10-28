@@ -58,9 +58,15 @@ def run_causal_analysis(input_file: str, output_folder: str):
     for r in range(1, len(target_all) + 1):
         combinations.extend(itertools.combinations(target_all, r))
 
+    total_combinations = len(combinations)
     # Process each combination
     for idx, target_subset in enumerate(combinations):
         target_select = list(target_subset)
+
+        # Update progress for combination
+        combination_progress = 5 + ((idx / total_combinations) * 90)
+        print(
+            f"[PROGRESS:{combination_progress:.1f}] Processing combination {idx+1}/{total_combinations}: {', '.join(target_select)}")
 
         # Create output subfolder for this combination
         nom_combinaison = "_".join([re.sub(r'\W+', '', t) for t in target_select])
@@ -83,6 +89,10 @@ def run_causal_analysis(input_file: str, output_folder: str):
         treatment_vars = [col for col in df_temp.columns if col not in target_vars]
 
         results = []
+
+        # Calculate total treatment-target pairs for this combination
+        total_pairs = len(treatment_vars) * len(target_vars)
+        current_pair = 0
 
         # Process each treatment-target pair
         for T_name in treatment_vars:
@@ -114,6 +124,13 @@ def run_causal_analysis(input_file: str, output_folder: str):
 
             # Process each target
             for Y_name in target_vars:
+                current_pair += 1
+                pair_progress_within_combination = (current_pair / total_pairs) * (90 / total_combinations)
+                total_progress = combination_progress + pair_progress_within_combination
+
+                print(
+                    f"[PROGRESS:{total_progress:.1f}] Analyzing {T_name} → {Y_name} (pair {current_pair}/{total_pairs})")
+
                 if Y_name not in df_temp.columns:
                     continue
 

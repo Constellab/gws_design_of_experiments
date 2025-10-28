@@ -1,34 +1,30 @@
+import multiprocessing
 import os
-import pandas as pd
+
 import numpy as np
-
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.multioutput import MultiOutputRegressor
-from sklearn.model_selection import cross_val_score, KFold, RandomizedSearchCV
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import Pipeline
-from sklearn.metrics import make_scorer, r2_score
-
-from xgboost import XGBRegressor
+import pandas as pd
 from catboost import CatBoostRegressor
-
-# pymoo imports
-from pymoo.core.problem import ElementwiseProblem
-from pymoo.optimize import minimize
+from gws_core import (ConfigParams, ConfigSpecs, Folder, InputSpec, InputSpecs,
+                      IntParam, JSONDict, OutputSpec, OutputSpecs, ParamSet,
+                      StrParam, Table, Task, TaskInputs, TaskOutputs,
+                      TypingStyle, task_decorator)
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.algorithms.soo.nonconvex.ga import GA
-from pymoo.termination import get_termination
-from pymoo.operators.sampling.lhs import LHS
+from pymoo.core.callback import Callback
+# pymoo imports
+from pymoo.core.problem import ElementwiseProblem, StarmapParallelization
 from pymoo.operators.crossover.sbx import SBX
 from pymoo.operators.mutation.pm import PM
-from pymoo.core.callback import Callback
-from pymoo.core.problem import StarmapParallelization
-
-import multiprocessing
-
-from gws_core import (ConfigParams, InputSpec, InputSpecs, OutputSpec,
-                      OutputSpecs, Task, TaskInputs, TaskOutputs, ListParam,
-                      task_decorator, ConfigSpecs, TypingStyle, Table, Folder, JSONDict, ParamSet, StrParam, IntParam)
+from pymoo.operators.sampling.lhs import LHS
+from pymoo.optimize import minimize
+from pymoo.termination import get_termination
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import make_scorer, r2_score
+from sklearn.model_selection import KFold, RandomizedSearchCV, cross_val_score
+from sklearn.multioutput import MultiOutputRegressor
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from xgboost import XGBRegressor
 
 
 @task_decorator("Optimization", human_name="Optimization", short_description="Optimization",
@@ -73,8 +69,8 @@ class Optimization(Task):
     """
 
     input_specs = InputSpecs({'data': InputSpec(Table, human_name="Data", short_description="Data",),
-                            'manual_constraints': InputSpec(JSONDict, human_name="Manual constraints",
-                            short_description="Manual constraints for optimization")})
+                              'manual_constraints': InputSpec(JSONDict, human_name="Manual constraints",
+                                                              short_description="Manual constraints for optimization")})
     config_specs = ConfigSpecs({
         'population_size': IntParam(default_value=500, optional=False, human_name="Population size", short_description="Population size for the optimization algorithm"),
         'iterations': IntParam(default_value=100, optional=False, human_name="Iterations"),
@@ -82,15 +78,14 @@ class Optimization(Task):
             'targets': StrParam(default_value=None, optional=False, human_name="Target", short_description="Target to optimize"),
             'thresholds': IntParam(default_value=None, optional=False, human_name="Objective", short_description="Objective value for the target"),
         }), optional=False, human_name="Targets with objectives", short_description="Targets to optimize and their objective values")
-        })
+    })
 
     output_specs = OutputSpecs({'results_folder': OutputSpec(
         Folder, human_name="Results folder", short_description="The folder containing the results"), })
 
-
     def run(self, params: ConfigParams, inputs: TaskInputs) -> TaskOutputs:
         """ Run the task """
-        ## Get inputs
+        # Get inputs
         data_filtered = inputs["data"].get_data()
         # Full threshold dictionary
         full_thresholds = {target['targets']: target['thresholds'] for target in params.get("targets_thresholds")}
@@ -98,7 +93,7 @@ class Optimization(Task):
         # Get parameters
         population_size = params.get("population_size")
         iterations = params.get("iterations")
-        #Manual constraints
+        # Manual constraints
         manual_constraints = inputs["manual_constraints"].get_data()
 
         columns_data = data_filtered.columns.tolist()
@@ -115,15 +110,12 @@ class Optimization(Task):
         output_dir = 'output_dir'
         os.makedirs(output_dir, exist_ok=True)
 
-
-
         # Supprimer les targets non sélectionnés
         for target in optimization_targets_all:
             if target not in optimization_targets and target in data_filtered.columns:
                 data_filtered = data_filtered.drop(target, axis=1)
 
-        data_filtered=data_filtered.dropna()
-
+        data_filtered = data_filtered.dropna()
 
         Y = data_filtered[optimization_targets]
         X = data_filtered.drop(columns=optimization_targets)
@@ -145,19 +137,19 @@ class Optimization(Task):
             'min_samples_split': [2, 5, 10],
             'min_samples_leaf': [1, 2, 4],
             'max_features': ['sqrt']
-        },scorer, X, Y, kf, pipelines)
+        }, scorer, X, Y, kf, pipelines)
 
         self.update_progress_value(25, message="Optimizing XGBoost model")
         pipelines = self.optimize_model("XGBoost", XGBRegressor(random_state=42), {
             'n_estimators': [100, 200, 300],
             'learning_rate': [0.01, 0.05, 0.2]
-        },scorer, X, Y, kf, pipelines)
+        }, scorer, X, Y, kf, pipelines)
 
         self.update_progress_value(40, message="Optimizing CatBoost model")
         pipelines = self.optimize_model("CatBoost", CatBoostRegressor(random_seed=42, verbose=0), {
             'iterations': [100, 200, 300],
             'learning_rate': [0.01, 0.05, 0.2]
-        },scorer, X, Y, kf, pipelines)
+        }, scorer, X, Y, kf, pipelines)
 
         self.update_progress_value(55, message="Selecting best model and preparing optimization")
         best_score, pipeline, model_name = max(pipelines, key=lambda x: x[0])
@@ -187,7 +179,6 @@ class Optimization(Task):
         constraints_df = pd.DataFrame({"Feature": X.columns, "Lower_Bound_Used": low_mod, "Upper_Bound_Used": up_mod})
         constraints_df.to_csv(os.path.join(output_dir, "constraints_used_in_optimization.csv"), index=False)
 
-
         n_proccess = 16
         pool = multiprocessing.Pool(n_proccess)
         runner = StarmapParallelization(pool.starmap)
@@ -216,7 +207,8 @@ class Optimization(Task):
             termination = get_termination("n_gen", iterations)
 
         self.update_progress_value(65, message="Starting optimization algorithm")
-        res = minimize(problem, algorithm, termination, seed=42, verbose=True, callback=MyCallback(output_dir=output_dir, save_every=10, task=self, iterations=iterations))
+        res = minimize(problem, algorithm, termination, seed=42, verbose=True, callback=MyCallback(
+            output_dir=output_dir, save_every=10, task=self, iterations=iterations))
         pool.close()
         pool.join()
 
@@ -235,11 +227,10 @@ class Optimization(Task):
                 if target in full_thresholds:
                     df_resultats[target + '_percent'] = (df_resultats[target] / full_thresholds[target])*100
 
-
             df_resultats.to_csv(os.path.join(output_dir, "generalized_solutions.csv"), index=False)
-            df_best = df_resultats.sort_values(by=['CV_percent'] + optimization_targets, ascending=[False] + [False]*len(optimization_targets)).iloc[[0]]
+            df_best = df_resultats.sort_values(by=['CV_percent'] + optimization_targets,
+                                               ascending=[False] + [False]*len(optimization_targets)).iloc[[0]]
             df_best.to_csv(os.path.join(output_dir, "best_generalized_solution.csv"), index=False)
-
 
         self.update_progress_value(100, message="Optimization completed")
 
@@ -248,7 +239,6 @@ class Optimization(Task):
 
         # return the output
         return {'results_folder': folder_results}
-
 
     def optimize_model(self, name, base_model, param_dist, scorer, X, Y, kf, pipelines, n_iter=200):
         search = RandomizedSearchCV(base_model, param_distributions=param_dist, n_iter=n_iter,
@@ -261,8 +251,11 @@ class Optimization(Task):
         pipelines.append((np.mean(score), pipe, name))
         return pipelines
 
+
 class MilieuOptimizationProblem(ElementwiseProblem):
-    def __init__(self, model, low, up, targets, all_outputs, output_thresholds, X_columns, add_cv=True, elementwise_runner=None):
+    def __init__(
+            self, model, low, up, targets, all_outputs, output_thresholds, X_columns, add_cv=True,
+            elementwise_runner=None):
         self.targets = targets
         self.add_cv = add_cv
         self.all_outputs = all_outputs
@@ -301,11 +294,11 @@ class MyCallback(Callback):
         best_cv = F[:, -1].min()
         gen = algorithm.n_gen
         self.history.append({"generation": gen, "best_cv": best_cv})
-        
+
         # Update progress during optimization
         if self.task and self.iterations:
             progress = 65 + (gen / self.iterations) * 30  # 65% to 95% for optimization
             self.task.update_progress_value(progress, message=f"Optimization generation {gen}/{self.iterations}")
-        
+
         if gen % self.save_every == 0:
             pd.DataFrame(self.history).to_csv(os.path.join(self.output_dir, "optimization_progress.csv"), index=False)

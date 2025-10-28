@@ -3,10 +3,11 @@ channels:
   - conda-forge
 dependencies:
   - python=3.10
-  - econml=0.15.1
+  - xgboost=3.0.2
+  - catboost=1.2.8
+  - pymoo=0.6.1.5
   - scikit-learn
   - numpy
   - pandas
-  - scipy
   - matplotlib
   - seaborn
