@@ -1,0 +1,12 @@
+name: .venv
+channels:
+  - conda-forge
+dependencies:
+  - python=3.9
+  - econml=0.15.1
+  - scikit-learn
+  - numpy
+  - pandas
+  - scipy
+  - matplotlib
+  - seaborn

@@ -9,20 +9,16 @@
         "bricks": [
             {
                 "name": "gws_core",
-                "version": "0.15.0"
+                "version": "0.17.0"
             }
         ],
         "pip": [
             {
                 "source": "https://pypi.python.org/simple",
                 "packages": [
-                    {   
-                        "name": "seaborn", 
-                        "version": "0.13.2"
-                    },
                     {
-                        "name": "econml",
-                        "version": "0.15.1"
+                        "name": "seaborn",
+                        "version": "0.13.2"
                     },
                     {
                         "name": "xgboost",
@@ -36,7 +32,6 @@
                         "name": "pymoo",
                         "version": "0.6.1.5"
                     }
-
                 ]
             }
         ],

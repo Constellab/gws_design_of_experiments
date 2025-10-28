@@ -1,22 +1,15 @@
 import os
-import pandas as pd
-import numpy as np
-import re
-import matplotlib.pyplot as plt
-import seaborn as sns
-import itertools
-from econml.dml import CausalForestDML, LinearDML
-from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
-from sklearn.preprocessing import StandardScaler
-from sklearn.feature_selection import mutual_info_regression
+import pickle
 
-from gws_core import (Settings, ConfigParams, InputSpec,
-                      InputSpecs, ListParam, OutputSpec, OutputSpecs, ConfigSpecs,
-                      Table, Task, TaskInputs,
-                      TaskOutputs, TypingStyle, task_decorator, Folder)
+from gws_core import (ConfigParams, ConfigSpecs, Folder, InputSpec, InputSpecs,
+                      ListParam, MambaShellProxy, OutputSpec, OutputSpecs,
+                      Table, Task, TaskInputs, TaskOutputs, TypingStyle,
+                      task_decorator)
+
+from .econml_env_helper import EconmlEnvHelper
 
 
-@task_decorator("CausalEffect", human_name="Causal Effect", short_description="Causal Effect",
+@task_decorator("CausalEffect2", human_name="Causal Effect2", short_description="Causal Effect",
                 style=TypingStyle.material_icon(material_icon_name="gradient",
                                                 background_color="#f17093"))
 class CausalEffect(Task):
@@ -89,155 +82,56 @@ class CausalEffect(Task):
     ERROR_NAME = "Error"
 
     def run(self, params: ConfigParams, inputs: TaskInputs) -> TaskOutputs:
+        # Create shell proxy for econml environment
+        shell_proxy: MambaShellProxy = EconmlEnvHelper.create_proxy(
+            self.message_dispatcher)
+
+        self.update_progress_value(5, message="Preparing data for virtual environment")
 
         # Load and prepare data
         df = inputs["data"].get_data()
         df_numeric = df.select_dtypes(include='number').dropna()
 
-        folder_output_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), Settings.make_temp_dir())
-
-        # Define targets
+        # Get targets from config
         target_all = params.get('targets')
 
-        # Générer toutes les combinaisons non vides de target_all
-        combinations = []
-        for r in range(1, len(target_all) + 1):
-            combinations.extend(itertools.combinations(target_all, r))
+        # Prepare input data for virtual environment
+        input_data = {
+            'dataframe': df_numeric,
+            'targets': target_all
+        }
 
-        # Calculate total progress steps
-        total_combinations = len(combinations)
-        self.update_progress_value(5, message="Preparing data and combinations")
+        # Create temporary files for input/output
+        input_file = os.path.join(shell_proxy.working_dir, "causal_input.pkl")
+        output_folder = os.path.join(shell_proxy.working_dir, "causal_results")
 
-        # Boucle sur chaque combinaison de cibles
-        for idx, target_subset in enumerate(combinations):
-            target_select = list(target_subset)
+        # Save input data
+        self.log_info_message("Saving input data for virtual environment")
+        with open(input_file, 'wb') as f:
+            pickle.dump(input_data, f)
 
-            # Update progress for combination
-            combination_progress = 5 + ((idx / total_combinations) * 90)
-            self.update_progress_value(combination_progress, 
-                                     message=f"Processing combination {idx+1}/{total_combinations}: {', '.join(target_select)}")
+        # Get path to the analysis script
+        script_path = os.path.join(os.path.dirname(__file__), "_run_causal_analysis.py")
 
-            # Créer le dossier de sortie
-            nom_combinaison = "_".join([re.sub(r'\W+', '', t) for t in target_select])
-            dossier_output = os.path.join(folder_output_path, nom_combinaison)
-            os.makedirs(dossier_output, exist_ok=True)
+        self.update_progress_value(10, message="Running causal analysis in virtual environment")
 
-            fichier_sortie = os.path.join(dossier_output, "causal_effects.csv")
-            fichier_plot = os.path.join(dossier_output, "heatmap_causal_effects.png")
+        # Run the complete analysis in virtual environment
+        cmd = ["python", script_path, input_file, output_folder]
+        result_code = shell_proxy.run(cmd)
 
-            # Préparer les données pour cette combinaison
-            df_temp = df_numeric.copy()
+        if result_code != 0:
+            self.log_error_message("Failed to run causal analysis in virtual environment")
+            raise Exception("Causal analysis failed in virtual environment")
 
-            # Supprimer les targets non sélectionnées
-            for target in target_all:
-                if target not in target_select and target in df_temp.columns:
-                    df_temp = df_temp.drop(target, axis=1)
+        self.update_progress_value(95, message="Analysis completed, retrieving results")
 
-            # Définir les variables
-            target_vars = [col for col in target_select if col in df_temp.columns]
-            treatment_vars = [col for col in df_temp.columns if col not in target_vars]
-
-            results = []
-            
-            # Calculate total treatment-target pairs for this combination
-            total_pairs = len(treatment_vars) * len(target_vars)
-            current_pair = 0
-
-            for T_name in treatment_vars:
-                if T_name not in df_temp.columns:
-                    continue
-
-                T = df_temp[T_name].values
-                if np.all(np.isnan(T)):
-                    continue
-
-                is_discrete = np.array_equal(np.unique(T[~np.isnan(T)]), [0, 1])
-                T_scaled = T if is_discrete else StandardScaler().fit_transform(T.reshape(-1, 1)).ravel()
-
-                other_treatments = [col for col in treatment_vars if col != T_name and col in df_temp.columns]
-                X_raw_full = df_temp.drop(columns=[T_name] + target_vars, errors='ignore')
-                X_raw_full = df_temp[other_treatments + list(X_raw_full.columns.difference(other_treatments))]
-
-                if X_raw_full.shape[1] == 0:
-                    X_scaled = None
-                else:
-                    X_raw_full = X_raw_full.fillna(0)
-                    mi_scores = mutual_info_regression(X_raw_full, T)
-                    top_idx = np.argsort(mi_scores)[-5:]
-                    X_selected = X_raw_full.iloc[:, top_idx]
-                    X_scaled = StandardScaler().fit_transform(X_selected)
-
-                for Y_name in target_vars:
-                    current_pair += 1
-                    pair_progress_within_combination = (current_pair / total_pairs) * (90 / total_combinations)
-                    total_progress = combination_progress + pair_progress_within_combination
-                    
-                    self.update_progress_value(total_progress, 
-                                             message=f"Analyzing {T_name} → {Y_name} (pair {current_pair}/{total_pairs})")
-
-                    if Y_name not in df_temp.columns:
-                        continue
-
-                    Y = df_temp[Y_name].values
-                    if np.all(np.isnan(Y)):
-                        continue
-
-                    scaler_Y = StandardScaler()
-                    Y_scaled = scaler_Y.fit_transform(Y.reshape(-1, 1)).ravel()
-
-                    try:
-                        model_t = RandomForestClassifier(
-                            n_estimators=100) if is_discrete else RandomForestRegressor(
-                            n_estimators=100)
-                        model = (LinearDML if is_discrete else CausalForestDML)(
-                            model_y=RandomForestRegressor(n_estimators=100),
-                            model_t=model_t,
-                            discrete_treatment=is_discrete,
-                            random_state=42
-                        )
-
-                        model.fit(Y_scaled, T_scaled, X=X_scaled)
-                        cate_scaled = model.effect(X_scaled if X_scaled is not None else None)
-                        avg_cate_scaled = np.mean(cate_scaled)
-                        avg_cate = avg_cate_scaled * scaler_Y.scale_[0]
-
-                        results.append({
-                            self.TREATMENT_NAME: T_name,
-                            self.TARGET_NAME: Y_name,
-                            self.AVERAGE_CAUSAL_EFFECT_NAME: avg_cate,
-                            self.TYPE_OF_TREATMENT_NAME: self.MODEL_DISCRETE if is_discrete else self.MODEL_CONTINUOUS,
-                            self.MODEL_NAME: self.MODEL_LINEAR_DML if is_discrete else self.MODEL_CAUSAL_FOREST_DML,
-                        })
-                    except Exception as e:
-                        results.append({
-                            self.TREATMENT_NAME: T_name,
-                            self.TARGET_NAME: Y_name,
-                            self.AVERAGE_CAUSAL_EFFECT_NAME: np.nan,
-                            self.ERROR_NAME: str(e)
-                        })
-
-            # Export des résultats
-            df_results = pd.DataFrame(results)
-            df_results.to_csv(fichier_sortie, index=False)
-
-            # Génération de la heatmap
-            heatmap_data = df_results.pivot(
-                index=self.TARGET_NAME, columns=self.TREATMENT_NAME, values=self.AVERAGE_CAUSAL_EFFECT_NAME)
-            if not heatmap_data.empty:
-                fig_width = max(12, 0.5 * len(heatmap_data.columns))
-                plt.figure(figsize=(fig_width, 8))
-                sns.heatmap(heatmap_data, annot=True, cmap="coolwarm", center=0, fmt=".2f")
-                plt.title(f"Heatmap - {self.TARGET_NAME}s: {', '.join(target_select)}")
-                plt.xlabel(self.TREATMENT_NAME)
-                plt.ylabel(self.TARGET_NAME)
-                plt.tight_layout()
-                plt.savefig(fichier_plot, bbox_inches="tight")
-                plt.close()
+        # The output_folder now contains all the CSV and PNG files organized in subfolders
+        # Return it directly as the Folder resource
+        folder_results = Folder(output_folder)
+        folder_results.name = "Causal Effects Results"
 
         self.update_progress_value(100, message="Causal effect analysis completed")
 
-        folder_results = Folder(folder_output_path)
-        folder_results.name = "Causal Effects Results"
         return {
             'results_folder': folder_results,
         }
