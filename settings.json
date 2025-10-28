@@ -1,7 +1,7 @@
 {
     "name": "gws_design_of_experiments",
     "author": "Gencovery",
-    "version": "0.1.3",
+    "version": "0.1.4",
     "variables": {
         "skeleton:testdata_dir": "${CURRENT_DIR}/tests/testdata"
     },
@@ -23,12 +23,7 @@
                 ]
             }
         ],
-        "git": [
-            {
-                "source": "https://$GWS_GIT_LOGIN:$GWS_GIT_PWD@gitlab.com/.../",
-                "packages": []
-            }
-        ],
+        "git": [],
         "variables": {}
     }
 }
