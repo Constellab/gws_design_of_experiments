@@ -59,7 +59,7 @@ def render_first_page(path_output_dir : str):
 
             df_stats = pd.DataFrame(stats_data)
             st.write("Mean is calculated on the top 10 solutions as well as standard deviation. Optimal value is the value of the parameter in the best solution.")
-            st.dataframe(df_stats, use_container_width=True, hide_index=True)
+            st.dataframe(df_stats, width="stretch", hide_index=True)
 
         with col_plots:
             # Multiselect for choosing parameters to plot
@@ -238,7 +238,7 @@ def render_first_page(path_output_dir : str):
 
         dataframe_paginated(
                 sorted_df, paginate_rows=True, row_page_size_options=[25, 50, 100],
-                paginate_columns=False, column_page_size_options=None, key="data_explorer_table", use_container_width=True)
+                paginate_columns=False, column_page_size_options=None, key="data_explorer_table", width="stretch")
 
         st.caption(
             f"Data are sorted by **{sort_col}** ({order} order)."
