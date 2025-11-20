@@ -5,6 +5,7 @@ from sklearn.preprocessing import StandardScaler
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+import plotly.express as px
 
 
 from gws_core import (ConfigParams, ConfigSpecs, InputSpec, InputSpecs,
@@ -161,18 +162,22 @@ class PLS(Task):
         r_squared = pls.score(X_test, y_test)
         mse = mean_squared_error(y_test, Y_pred)
 
+        # Flatten arrays for plotting (handles both single and multiple targets)
+        y_test_flat = np.array(y_test).flatten()
+        y_pred_flat = Y_pred.flatten()
+
         # Create Plotly plot for predicted vs actual values
         predict_vs_actual_plot = go.Figure()
         predict_vs_actual_plot.add_trace(go.Scatter(
-            x=y_test,
-            y=Y_pred,
+            x=y_test_flat,
+            y=y_pred_flat,
             mode='markers',
             marker=dict(color='blue', size=8),
             name='Actual vs Predicted'
         ))
         predict_vs_actual_plot.add_trace(go.Scatter(
-            x=[min(y_test), max(y_test)],
-            y=[min(y_test), max(y_test)],
+            x=[y_test_flat.min(), y_test_flat.max()],
+            y=[y_test_flat.min(), y_test_flat.max()],
             mode='lines',
             line=dict(color='red', dash='dash'),
             name='Perfect Prediction'
@@ -195,23 +200,23 @@ class PLS(Task):
         # VIP calculation
         vip_scores = self.vip(pls)
         vip_df = pd.DataFrame({'Variable': X_columns, 'VIP': vip_scores})
-        # Sort by VIP score
-        vip_df = vip_df.sort_values(by='VIP', ascending=False)
+        # Sort by VIP score and reset index to ensure proper ordering
+        vip_df = vip_df.sort_values(by='VIP', ascending=True).reset_index(drop=True)
 
-        # Create VIP plot with Plotly
-        vip_plot = go.Figure()
-        vip_plot.add_trace(go.Bar(
-            x=vip_df['VIP'],
-            y=vip_df['Variable'],
+        # Create VIP plot with Plotly Express
+        vip_plot = px.bar(
+            vip_df,
+            x='VIP',
+            y='Variable',
             orientation='h',
-            marker=dict(color='skyblue')
-        ))
-        vip_plot.update_layout(
             title='Variable Importance in Projection (VIP) Scores',
-            xaxis_title='VIP Score',
-            yaxis_title='Variable',
-            yaxis={'categoryorder': 'total ascending'},  # Highest VIP at the top
-            height=max(400, len(vip_df) * 25)  # Dynamic height based on number of variables
+            labels={'VIP': 'VIP Score', 'Variable': 'Variable'},
+            height=max(400, len(vip_df) * 25)
+        )
+        vip_plot.update_traces(marker_color='skyblue')
+        vip_plot.update_layout(
+            margin=dict(l=200, r=20, t=50, b=50),  # Increase left margin to prevent label cropping
+            yaxis={'categoryorder': 'trace'}  # Preserve order from DataFrame
         )
 
         return {
@@ -223,11 +228,25 @@ class PLS(Task):
 
 
     def vip(self, pls):
+        """
+        Calculate Variable Importance in Projection (VIP) scores.
+
+        VIP scores estimate the importance of each variable in the projection used in a PLS model.
+        Variables with VIP > 1 are generally considered important.
+        """
         t = pls.x_scores_
         w = pls.x_weights_
         q = pls.y_loadings_
         p, h = w.shape
-        s = np.diag(t.T @ t @ q.T @ q).reshape(h, -1)
-        Wnorm = (w / np.linalg.norm(w, axis=0))
-        VIP = np.sqrt(p * (Wnorm**2 @ s) / s.sum())
-        return VIP.ravel()
+
+        # Calculate sum of squares of y explained by each component
+        s = np.diag(t.T @ t @ q.T @ q).reshape(h, 1)
+        total_s = np.sum(s)
+
+        # Normalize weights
+        w_norm = w / np.linalg.norm(w, axis=0)
+
+        # Calculate VIP scores
+        vip = np.sqrt(p * (w_norm**2 @ s) / total_s)
+
+        return vip.ravel()
