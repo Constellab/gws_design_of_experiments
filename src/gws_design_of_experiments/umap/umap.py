@@ -41,6 +41,7 @@ class UMAPTask(Task):
         - scale_data: Whether to standardize features before UMAP
         - n_clusters: Number of clusters for K-Means (optional)
         - color_by: Column name to color points by (optional)
+        - columns_to_exclude: Comma-separated list of column names to exclude from UMAP analysis
     """
     METRICS_OPTION = ["euclidean", "manhattan", "chebyshev", "minkowski", "canberra",
                         "braycurtis", "mahalanobis", "wminkowski", "seuclidean",
@@ -81,6 +82,10 @@ class UMAPTask(Task):
         'color_by': StrParam(
             human_name="Color By Column",
             short_description="Column name to color points by (optional)",
+            optional=True),
+        'columns_to_exclude': StrParam(
+            human_name="Columns to Exclude",
+            short_description="Comma-separated list of column names to exclude from UMAP analysis",
             optional=True)
     })
 
@@ -106,6 +111,16 @@ class UMAPTask(Task):
     def run(self, params: ConfigParams, inputs: TaskInputs) -> TaskOutputs:
         # Load data
         df = inputs["data"].get_data()
+
+        # Exclude specified columns
+        columns_to_drop = []
+        if params['columns_to_exclude']:
+            columns_to_drop = [col.strip() for col in params['columns_to_exclude'].split(',')]
+            # Validate that columns exist
+            invalid_cols = [col for col in columns_to_drop if col not in df.columns]
+            if invalid_cols:
+                raise ValueError(f"Columns not found in data: {', '.join(invalid_cols)}")
+            df = df.drop(columns=columns_to_drop)
 
         # Separate color column if specified
         color_column = None

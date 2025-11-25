@@ -47,6 +47,7 @@ class PLS(Task):
         - test_size: Proportion of data for test set (0.0-1.0)
         - number_of_components: Number of PLS components (auto-selected if not specified)
         - scale_data: Whether to standardize features before modeling
+        - columns_to_exclude: Comma-separated list of column names to exclude from PLS analysis
     """
 
     input_specs = InputSpecs({'data': InputSpec(Table, human_name="Data",
@@ -73,7 +74,11 @@ class PLS(Task):
             'scale_data': BoolParam(
                 default_value=True,
                 human_name="Scale Data",
-                short_description="Whether to scale the data before fitting the PLS model.")})
+                short_description="Whether to scale the data before fitting the PLS model."),
+            'columns_to_exclude': StrParam(
+                human_name="Columns to Exclude",
+                short_description="Comma-separated list of column names to exclude from PLS analysis",
+                optional=True)})
     output_specs = OutputSpecs({'pls_component_plot': OutputSpec(
         PlotlyResource, human_name="PLS Component Plot", short_description="The PLS component plot"),
         'predict_vs_actual_plot': OutputSpec(
@@ -93,6 +98,16 @@ class PLS(Task):
 
         # Load data
         df = inputs["data"].get_data()
+
+        # Exclude specified columns
+        columns_to_drop = []
+        if params['columns_to_exclude']:
+            columns_to_drop = [col.strip() for col in params['columns_to_exclude'].split(',')]
+            # Validate that columns exist
+            invalid_cols = [col for col in columns_to_drop if col not in df.columns]
+            if invalid_cols:
+                raise ValueError(f"Columns not found in data: {', '.join(invalid_cols)}")
+            df = df.drop(columns=columns_to_drop)
 
         # X = all composition + medium parameters
         X = df.drop(columns=target_columns)
