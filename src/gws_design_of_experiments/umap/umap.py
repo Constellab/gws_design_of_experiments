@@ -5,7 +5,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 
 from gws_core import (ConfigParams, ConfigSpecs, InputSpec, InputSpecs,
-                      OutputSpec, OutputSpecs,
+                      OutputSpec, OutputSpecs, ListParam,
                       Table, Task, TaskInputs, TaskOutputs, TypingStyle, PlotlyResource,
                       task_decorator, IntParam, FloatParam, BoolParam, StrParam)
 
@@ -83,9 +83,13 @@ class UMAPTask(Task):
             human_name="Color By Column",
             short_description="Column name to color points by (optional)",
             optional=True),
-        'columns_to_exclude': StrParam(
+        'columns_to_exclude': ListParam(
             human_name="Columns to Exclude",
             short_description="Comma-separated list of column names to exclude from UMAP analysis",
+            optional=True),
+        'hover_data_columns': ListParam(
+            human_name="Hover Data Columns",
+            short_description="Comma-separated list of column names to display as metadata on hover",
             optional=True)
     })
 
@@ -112,10 +116,22 @@ class UMAPTask(Task):
         # Load data
         df = inputs["data"].get_data()
 
+        # Extract hover data columns if specified
+        hover_data = {}
+        if params['hover_data_columns']:
+            hover_cols = [col.strip() for col in params['hover_data_columns']]
+            # Validate that columns exist
+            invalid_cols = [col for col in hover_cols if col not in df.columns]
+            if invalid_cols:
+                raise ValueError(f"Hover data columns not found in data: {', '.join(invalid_cols)}")
+
+            for col in hover_cols:
+                hover_data[col] = df[col].copy()
+
         # Exclude specified columns
         columns_to_drop = []
         if params['columns_to_exclude']:
-            columns_to_drop = [col.strip() for col in params['columns_to_exclude'].split(',')]
+            columns_to_drop = [col.strip() for col in params['columns_to_exclude']]
             # Validate that columns exist
             invalid_cols = [col for col in columns_to_drop if col not in df.columns]
             if invalid_cols:
@@ -190,6 +206,11 @@ class UMAPTask(Task):
             result_2d_df['ColorBy'] = color_column.values.astype(str)
             result_3d_df['ColorBy'] = color_column.values.astype(str)
 
+        # Add hover data columns
+        for col_name, col_data in hover_data.items():
+            result_2d_df[col_name] = col_data.values
+            result_3d_df[col_name] = col_data.values
+
         # Determine color parameter
         color_param = None
         color_labels = {}
@@ -200,6 +221,9 @@ class UMAPTask(Task):
             if params['color_by']:
                 color_labels = {'ColorBy': params['color_by']}
 
+        # Prepare hover data list for plots
+        hover_data_list = list(hover_data.keys()) if hover_data else None
+
         # Create 2D visualization with px.scatter
         fig_2d = px.scatter(
             result_2d_df,
@@ -207,6 +231,7 @@ class UMAPTask(Task):
             y='UMAP2',
             color=color_param,
             hover_name=result_2d_df.index,
+            hover_data=hover_data_list,
             labels=color_labels,
             title="UMAP 2D Embedding"
         )
@@ -222,6 +247,7 @@ class UMAPTask(Task):
             z='UMAP3',
             color=color_param,
             hover_name=result_3d_df.index,
+            hover_data=hover_data_list,
             labels=color_labels,
             title="UMAP 3D Embedding"
         )
