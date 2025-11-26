@@ -33,6 +33,7 @@ MODEL_CONTINUOUS = "Continuous"
 MODEL_LINEAR_DML = "LinearDML"
 MODEL_CAUSAL_FOREST_DML = "CausalForestDML"
 ERROR_NAME = "Error"
+COMBINATION_SEPARATOR = "|"
 
 
 def run_causal_analysis(input_file: str, output_folder: str):
@@ -69,7 +70,7 @@ def run_causal_analysis(input_file: str, output_folder: str):
             f"[PROGRESS:{combination_progress:.1f}] Processing combination {idx+1}/{total_combinations}: {', '.join(target_select)}")
 
         # Create output subfolder for this combination
-        nom_combinaison = "_".join([re.sub(r'\W+', '', t) for t in target_select])
+        nom_combinaison = COMBINATION_SEPARATOR.join([re.sub(r'\W+', '', t) for t in target_select])
         dossier_output = os.path.join(output_folder, nom_combinaison)
         os.makedirs(dossier_output, exist_ok=True)
 

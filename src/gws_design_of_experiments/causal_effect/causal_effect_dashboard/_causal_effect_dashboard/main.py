@@ -94,7 +94,8 @@ if sources:
 
     pages = {}
 
-    if "_" in CausalEffectState.get_combinations():
+    # Check if current combination has multiple targets
+    if CausalEffectState.is_multi_target_combination(CausalEffectState.get_combinations()):
         _multiple_effect_page = st.Page(_render_multiple_effect_page, title='Multiple effect', url_path='multiple-effect-page', icon='📊')
         pages['Multiple effect'] = [_multiple_effect_page]
     else:

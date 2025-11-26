@@ -80,6 +80,7 @@ class CausalEffect(Task):
     MODEL_LINEAR_DML = "LinearDML"
     MODEL_CAUSAL_FOREST_DML = "CausalForestDML"
     ERROR_NAME = "Error"
+    COMBINATION_SEPARATOR = "|"
 
     def run(self, params: ConfigParams, inputs: TaskInputs) -> TaskOutputs:
         # Create shell proxy for econml environment

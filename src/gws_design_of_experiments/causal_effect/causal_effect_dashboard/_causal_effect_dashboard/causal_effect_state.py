@@ -12,6 +12,7 @@ class CausalEffectState:
     DF_FILTERED_KEY = "df_filtered"
     INPUT_FOLDER_KEY = "input_folder"
     SETTINGS_KEY = "settings"
+    COMBINATION_SEPARATOR = "|"
 
 
     ###### Getters and Setters for the state ######
@@ -62,3 +63,13 @@ class CausalEffectState:
         """Get display name for an original name from settings"""
         settings = cls.get_settings()
         return settings.get(original_name, original_name)
+
+    @classmethod
+    def is_multi_target_combination(cls, combination: str) -> bool:
+        """Check if a combination string represents multiple targets"""
+        return cls.COMBINATION_SEPARATOR in combination
+
+    @classmethod
+    def get_targets_from_combination(cls, combination: str) -> List[str]:
+        """Extract individual target names from a combination string"""
+        return combination.split(cls.COMBINATION_SEPARATOR)
