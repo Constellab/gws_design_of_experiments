@@ -9,7 +9,7 @@ import plotly.express as px
 
 
 from gws_core import (ConfigParams, ConfigSpecs, InputSpec, InputSpecs,
-                      OutputSpec, OutputSpecs, ParamSet,
+                      OutputSpec, OutputSpecs, ParamSet, ResourceSet,
                       Table, Task, TaskInputs, TaskOutputs, TypingStyle, PlotlyResource,
                       task_decorator, StrParam, FloatParam, IntParam, BoolParam)
 
@@ -81,8 +81,8 @@ class PLS(Task):
                 optional=True)})
     output_specs = OutputSpecs({'pls_component_plot': OutputSpec(
         PlotlyResource, human_name="PLS Component Plot", short_description="The PLS component plot"),
-        'predict_vs_actual_plot': OutputSpec(
-            PlotlyResource, human_name="Predicted vs Actual Plot", short_description="The predicted vs actual values plot"),
+        'predict_vs_actual_plots': OutputSpec(
+            ResourceSet, human_name="Predicted vs Actual Plots", short_description="Predicted vs actual values plots for each target"),
         'vip_plot': OutputSpec(
             PlotlyResource, human_name="VIP plot", short_description="VIP plot"),
         'vip_table': OutputSpec(
@@ -112,9 +112,17 @@ class PLS(Task):
         # X = all composition + medium parameters
         X = df.drop(columns=target_columns)
 
-        #If X contains a categorical variable, raise an error
-        if X.select_dtypes(include=['object', 'category', 'string']).shape[1] > 0:
-            raise ValueError("Categorical variables are not supported in PLS Regression. Please encode or remove them.")
+        #If X contains a categorical variable, raise an error and precise columns names
+        categorical_cols = X.select_dtypes(include=['object', 'category', 'string']).columns.tolist()
+        if len(categorical_cols) > 0:
+            raise ValueError(f"Categorical variables are not supported in PLS Regression. Please encode or remove them. Categorical columns found: {', '.join(categorical_cols)}")
+
+        # Remove columns with variance < 10e-6 (constant or near-constant values)
+        variances = X.var()
+        low_variance_cols = variances[variances < 1e-6].index.tolist()
+        if len(low_variance_cols) > 0:
+            self.log_info_message(f"Removing {len(low_variance_cols)} columns with variance < 1e-6: {', '.join(low_variance_cols)}")
+            X = X.drop(columns=low_variance_cols)
 
         # Y = target variable(s)
         y = df[target_columns]
@@ -137,7 +145,7 @@ class PLS(Task):
             X_test = X_test.values
 
         # Determine max components based on training set
-        max_components = min(X_train.shape[0], X_train.shape[1])
+        max_components = min(X_train.shape[0], X_train.shape[1], 15)
         mse_list = []
 
         for n in range(1, max_components+1):
@@ -177,40 +185,94 @@ class PLS(Task):
         r_squared = pls.score(X_test, y_test)
         mse = mean_squared_error(y_test, Y_pred)
 
-        # Flatten arrays for plotting (handles both single and multiple targets)
-        y_test_flat = np.array(y_test).flatten()
-        y_pred_flat = Y_pred.flatten()
+        # Create separate plots for each target variable
+        predict_plots = ResourceSet()
 
-        # Create Plotly plot for predicted vs actual values
-        predict_vs_actual_plot = go.Figure()
-        predict_vs_actual_plot.add_trace(go.Scatter(
-            x=y_test_flat,
-            y=y_pred_flat,
-            mode='markers',
-            marker=dict(color='blue', size=8),
-            name='Actual vs Predicted'
-        ))
-        predict_vs_actual_plot.add_trace(go.Scatter(
-            x=[y_test_flat.min(), y_test_flat.max()],
-            y=[y_test_flat.min(), y_test_flat.max()],
-            mode='lines',
-            line=dict(color='red', dash='dash'),
-            name='Perfect Prediction'
-        ))
-        predict_vs_actual_plot.update_layout(
-            title="PLS Regression: Predicted vs Actual mu",
-            xaxis_title="Actual mu",
-            yaxis_title="Predicted mu",
-            annotations=[dict(
-                text=f'R²: {r_squared:.2f}<br>MSE: {mse:.2f}<br>Number of Components: {best_n}',
-                xref="paper", yref="paper",
-                x=0.05, y=0.95,
-                showarrow=False,
-                bgcolor="wheat",
-                bordercolor="black",
-                borderwidth=1
-            )]
-        )
+        # Handle both single and multiple targets
+        if len(target_columns) == 1:
+            # Single target case
+            target_name = target_columns[0]
+            y_test_vals = np.array(y_test).flatten()
+            y_pred_vals = Y_pred.flatten()
+
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=y_test_vals,
+                y=y_pred_vals,
+                mode='markers',
+                marker=dict(color='blue', size=8),
+                name='Actual vs Predicted'
+            ))
+            fig.add_trace(go.Scatter(
+                x=[y_test_vals.min(), y_test_vals.max()],
+                y=[y_test_vals.min(), y_test_vals.max()],
+                mode='lines',
+                line=dict(color='red', dash='dash'),
+                name='Perfect Prediction'
+            ))
+
+            # Calculate R² and MSE for this target
+            target_r2 = r_squared if isinstance(r_squared, float) else r_squared
+            target_mse = mse if isinstance(mse, float) else mse
+
+            fig.update_layout(
+                title=f"PLS Regression: Predicted vs Actual {target_name}",
+                xaxis_title=f"Actual {target_name}",
+                yaxis_title=f"Predicted {target_name}",
+                annotations=[dict(
+                    text=f'R²: {target_r2:.2f}<br>MSE: {target_mse:.2f}<br>Number of Components: {best_n}',
+                    xref="paper", yref="paper",
+                    x=0.05, y=0.95,
+                    showarrow=False,
+                    bgcolor="wheat",
+                    bordercolor="black",
+                    borderwidth=1
+                )]
+            )
+            predict_plots.add_resource(PlotlyResource(fig), target_name)
+
+        else:
+            # Multiple targets case
+            for i, target_name in enumerate(target_columns):
+                y_test_vals = np.array(y_test.iloc[:, i])
+                y_pred_vals = Y_pred[:, i]
+
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(
+                    x=y_test_vals,
+                    y=y_pred_vals,
+                    mode='markers',
+                    marker=dict(color='blue', size=8),
+                    name='Actual vs Predicted'
+                ))
+                fig.add_trace(go.Scatter(
+                    x=[y_test_vals.min(), y_test_vals.max()],
+                    y=[y_test_vals.min(), y_test_vals.max()],
+                    mode='lines',
+                    line=dict(color='red', dash='dash'),
+                    name='Perfect Prediction'
+                ))
+
+                # Calculate R² and MSE for this specific target
+                from sklearn.metrics import r2_score
+                target_r2 = r2_score(y_test_vals, y_pred_vals)
+                target_mse = mean_squared_error(y_test_vals, y_pred_vals)
+
+                fig.update_layout(
+                    title=f"PLS Regression: Predicted vs Actual {target_name}",
+                    xaxis_title=f"Actual {target_name}",
+                    yaxis_title=f"Predicted {target_name}",
+                    annotations=[dict(
+                        text=f'R²: {target_r2:.2f}<br>MSE: {target_mse:.2f}<br>Number of Components: {best_n}',
+                        xref="paper", yref="paper",
+                        x=0.05, y=0.95,
+                        showarrow=False,
+                        bgcolor="wheat",
+                        bordercolor="black",
+                        borderwidth=1
+                    )]
+                )
+                predict_plots.add_resource(PlotlyResource(fig), target_name)
 
         # VIP calculation
         vip_scores = self.vip(pls)
@@ -236,7 +298,7 @@ class PLS(Task):
 
         return {
             'pls_component_plot': PlotlyResource(pls_component_plot),
-            'predict_vs_actual_plot': PlotlyResource(predict_vs_actual_plot),
+            'predict_vs_actual_plots': predict_plots,
             'vip_table': Table(vip_df),
             'vip_plot': PlotlyResource(vip_plot)
         }
