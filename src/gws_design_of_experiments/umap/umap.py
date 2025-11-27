@@ -85,11 +85,11 @@ class UMAPTask(Task):
             optional=True),
         'columns_to_exclude': ListParam(
             human_name="Columns to Exclude",
-            short_description="Comma-separated list of column names to exclude from UMAP analysis",
+            short_description="List of column names to exclude from UMAP analysis",
             optional=True),
         'hover_data_columns': ListParam(
             human_name="Hover Data Columns",
-            short_description="Comma-separated list of column names to display as metadata on hover",
+            short_description="List of column names to display as metadata on hover",
             optional=True)
     })
 
