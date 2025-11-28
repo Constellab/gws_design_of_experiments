@@ -1,4 +1,6 @@
 from umap import UMAP
+from scipy import stats
+import numpy as np
 import pandas as pd
 import plotly.express as px
 from sklearn.preprocessing import StandardScaler
@@ -128,21 +130,44 @@ class UMAPTask(Task):
             for col in hover_cols:
                 hover_data[col] = df[col].copy()
 
+        # Preserve color column BEFORE excluding columns
+        color_column = None
+        color_column_is_numeric = False
+        color_log_applied = False
+        should_log_transform = False
+        if params['color_by'] and params['color_by'] in df.columns:
+            color_column = df[params['color_by']].copy()
+            # Check if color column is numeric
+            color_column_is_numeric = pd.api.types.is_numeric_dtype(color_column)
+            if color_column_is_numeric:
+                # Calculate skewness to determine if log transform is beneficial
+                skewness = stats.skew(color_column.dropna())
+                # Common threshold: skewness > 2 indicates high positive skew
+                if skewness > 2:
+                    should_log_transform = True
+
+                # Apply log transformation if needed
+                if should_log_transform:
+                    # Add small constant to avoid log(0)
+                    min_positive = color_column[color_column > 0].min() if (color_column > 0).any() else 1
+                    color_column = np.log10(color_column + min_positive * 0.01)
+                    color_log_applied = True
+
         # Exclude specified columns
         columns_to_drop = []
         if params['columns_to_exclude']:
-            columns_to_drop = [col.strip() for col in params['columns_to_exclude']]
+            columns_to_drop = [col for col in params['columns_to_exclude']]
             # Validate that columns exist
             invalid_cols = [col for col in columns_to_drop if col not in df.columns]
             if invalid_cols:
                 raise ValueError(f"Columns not found in data: {', '.join(invalid_cols)}")
-            df = df.drop(columns=columns_to_drop)
 
-        # Separate color column if specified
-        color_column = None
-        if params['color_by'] and params['color_by'] in df.columns:
-            color_column = df[params['color_by']].copy()
-            X = df.drop(columns=[params['color_by']])
+        # Remove duplicates
+        columns_to_drop = list(set(columns_to_drop))
+
+        # Drop excluded columns
+        if columns_to_drop:
+            X = df.drop(columns=columns_to_drop).copy()
         else:
             X = df.copy()
 
@@ -203,23 +228,33 @@ class UMAPTask(Task):
 
         # Add color column if provided
         if color_column is not None:
-            result_2d_df['ColorBy'] = color_column.values.astype(str)
-            result_3d_df['ColorBy'] = color_column.values.astype(str)
+            if color_column_is_numeric:
+                result_2d_df['ColorBy'] = color_column.values
+                result_3d_df['ColorBy'] = color_column.values
+            else:
+                result_2d_df['ColorBy'] = color_column.values.astype(str)
+                result_3d_df['ColorBy'] = color_column.values.astype(str)
 
         # Add hover data columns
         for col_name, col_data in hover_data.items():
             result_2d_df[col_name] = col_data.values
             result_3d_df[col_name] = col_data.values
 
-        # Determine color parameter
+        # Determine color parameter and color scale
         color_param = None
         color_labels = {}
+        color_continuous_scale = None
+
         if params['n_clusters'] is not None:
             color_param = 'Cluster'
         elif color_column is not None:
             color_param = 'ColorBy'
             if params['color_by']:
-                color_labels = {'ColorBy': params['color_by']}
+                label_suffix = " (log10)" if color_log_applied else ""
+                color_labels = {'ColorBy': params['color_by'] + label_suffix}
+            # Use continuous color scale for numeric data
+            if color_column_is_numeric:
+                color_continuous_scale = 'Viridis'
 
         # Prepare hover data list for plots
         hover_data_list = list(hover_data.keys()) if hover_data else None
@@ -230,6 +265,7 @@ class UMAPTask(Task):
             x='UMAP1',
             y='UMAP2',
             color=color_param,
+            color_continuous_scale=color_continuous_scale,
             hover_name=result_2d_df.index,
             hover_data=hover_data_list,
             labels=color_labels,
@@ -246,6 +282,7 @@ class UMAPTask(Task):
             y='UMAP2',
             z='UMAP3',
             color=color_param,
+            color_continuous_scale=color_continuous_scale,
             hover_name=result_3d_df.index,
             hover_data=hover_data_list,
             labels=color_labels,
