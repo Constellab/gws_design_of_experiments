@@ -3,7 +3,9 @@ channels:
   - conda-forge
 dependencies:
   - python=3.10
-  - xgboost=3.0.2
+  - libgcc-ng>=12.0.0
+  - libstdcxx-ng>=12.0.0
+  - libgomp
   - catboost=1.2.8
   - pymoo=0.6.1.5
   - scikit-learn
@@ -11,3 +13,6 @@ dependencies:
   - pandas
   - matplotlib
   - seaborn
+  - pip
+  - pip:
+    - xgboost==3.0.2
