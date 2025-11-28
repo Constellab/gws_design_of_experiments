@@ -207,18 +207,21 @@ class AutomaticPLSRegressor:
 
         # VIP scores
         vip_values = self._compute_vip(best_pls)
-        
+
         # Extract regression coefficients
         # For multi-output, coef_ has shape (n_targets, n_features)
-        # For single output, coef_ has shape (n_features,)
-        coefs = best_pls.coef_  # (n_features,) or (n_targets, n_features)
-        if coefs.ndim == 1:
-            # Single output: coefs is already (n_features,)
-            avg_coefs = coefs
+        # For single output, coef_ has shape (1, n_features)
+        coefs = best_pls.coef_  # (1, n_features) or (n_targets, n_features)
+
+        # Always squeeze to handle both cases, then average if needed
+        if coefs.shape[0] == 1:
+            # Single output: shape (1, n_features) -> (n_features,)
+            avg_coefs = coefs.squeeze()
         else:
             # Multi-output: average across targets (axis=0)
+            # TODO see to display one graph per target instead
             avg_coefs = np.mean(coefs, axis=0)
-        
+
         self.vip_df_ = pd.DataFrame({
             "feature": self.feature_names_,
             "VIP": vip_values,
@@ -261,15 +264,17 @@ class AutomaticPLSRegressor:
             x="feature",
             y="VIP",
             color="sign",
-            title="PLS VIP scores (colored by coefficient sign)",
+            title="PLS VIP scores (colored by regresssion coefficient sign)",
             color_discrete_map={"+": "steelblue", "-": "coral"},
             hover_data={"coefficient": ":.4f", "VIP": ":.4f", "sign": True},
-            category_orders={"feature": df["feature"].tolist()}  # Preserve VIP order
+            category_orders={"feature": df["feature"].tolist()},  # Preserve VIP order
+            text=df["coefficient"].round(2)  # Add coefficient values as text
         )
+        fig.update_traces(textposition='outside')  # Place text above bars
         fig.update_layout(
-            xaxis_title="Feature", 
+            xaxis_title="Feature",
             yaxis_title="VIP score",
-            legend_title="Coefficient Sign"
+            legend_title="Regression coefficient sign"
         )
         return fig
 
@@ -375,7 +380,7 @@ class AutomaticPLSRegressor:
         if add_identity_line:
             min_val = min(df["y_true"].min(), df["y_pred"].min())
             max_val = max(df["y_true"].max(), df["y_pred"].max())
-            
+
             # Add identity line to each subplot/facet
             for t_idx in range(n_targets):
                 fig.add_trace(
