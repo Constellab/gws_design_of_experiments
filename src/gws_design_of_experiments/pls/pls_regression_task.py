@@ -11,14 +11,14 @@ from gws_design_of_experiments.pls.pls_regression import AutomaticPLSRegressor
 class PLSRegressorTask(Task):
     """
     Partial Least Squares (PLS) Regression Task with automatic component selection.
-    
+
     This task performs PLS regression with cross-validation to determine the optimal
     number of components. It supports both single and multi-output regression and
     provides VIP (Variable Importance in Projection) scores for feature interpretation.
-    
+
     Inputs:
         - data: Input table containing features and target variable(s)
-        
+
     Outputs:
         - summary_table: Performance metrics (R², RMSE) per target for train and test sets
         - vip_table: VIP scores ranked by importance
@@ -26,7 +26,7 @@ class PLSRegressorTask(Task):
         - vip_plot: Bar plot of VIP scores
         - plot_train_set: Predicted vs true values for training set (faceted by target)
         - plot_test_set: Predicted vs true values for test set (faceted by target)
-        
+
     Configuration:
         - target: List of target column name(s) to predict
         - columns_to_exclude: List of column names to exclude from analysis (optional)
@@ -62,15 +62,15 @@ class PLSRegressorTask(Task):
     def run(self, params: ConfigParams, inputs: TaskInputs) -> TaskOutputs:
         """
         Execute the PLS regression task.
-        
+
         Parameters
         ----------
         params : ConfigParams
-            Configuration parameters including target, columns_to_exclude, 
+            Configuration parameters including target, columns_to_exclude,
             scale_data, and test_size
         inputs : TaskInputs
             Input data table
-            
+
         Returns
         -------
         TaskOutputs
@@ -134,7 +134,7 @@ class PLSRegressorTask(Task):
     def main(self, X, y, target_name, test_size, scale_data):
         """
         Main execution logic for PLS regression.
-        
+
         Parameters
         ----------
         X : DataFrame or array
@@ -147,7 +147,7 @@ class PLSRegressorTask(Task):
             Proportion of data for testing
         scale_data : bool
             Whether to scale the data
-            
+
         Returns
         -------
         tuple
@@ -157,7 +157,7 @@ class PLSRegressorTask(Task):
         model.fit(X, y)
 
         metric_df = model.metrics_df
-        vip_df = model.vip_df.head()
+        vip_df = model.vip_df
 
         fig_vip = model.plot_vip(top_n=20)
         fig_cv = model.plot_cv_scores(use_rmse=True)

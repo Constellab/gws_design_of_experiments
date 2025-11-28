@@ -207,9 +207,23 @@ class AutomaticPLSRegressor:
 
         # VIP scores
         vip_values = self._compute_vip(best_pls)
+        
+        # Extract regression coefficients
+        # For multi-output, coef_ has shape (n_targets, n_features)
+        # For single output, coef_ has shape (n_features,)
+        coefs = best_pls.coef_  # (n_features,) or (n_targets, n_features)
+        if coefs.ndim == 1:
+            # Single output: coefs is already (n_features,)
+            avg_coefs = coefs
+        else:
+            # Multi-output: average across targets (axis=0)
+            avg_coefs = np.mean(coefs, axis=0)
+        
         self.vip_df_ = pd.DataFrame({
             "feature": self.feature_names_,
-            "VIP": vip_values
+            "VIP": vip_values,
+            "coefficient": avg_coefs,
+            "sign": ["+" if c >= 0 else "-" for c in avg_coefs]
         }).sort_values("VIP", ascending=False).reset_index(drop=True)
 
         return self
@@ -230,8 +244,9 @@ class AutomaticPLSRegressor:
     # ---- Plotting methods (Plotly) ----
     def plot_vip(self, top_n=None):
         """
-        Bar plot of VIP scores.
+        Bar plot of VIP scores with color coding based on coefficient sign.
         If top_n is provided, only show the top N features.
+        Features are displayed in order of VIP importance (mixed +/- coefficients).
         """
         if self.vip_df_ is None:
             raise RuntimeError("Model not fitted yet. Call .fit(X, y) first.")
@@ -240,13 +255,22 @@ class AutomaticPLSRegressor:
         if top_n is not None:
             df = df.head(top_n)
 
+        # Ensure features display in VIP order (already sorted in vip_df_)
         fig = px.bar(
             df,
             x="feature",
             y="VIP",
-            title="PLS VIP scores",
+            color="sign",
+            title="PLS VIP scores (colored by coefficient sign)",
+            color_discrete_map={"+": "steelblue", "-": "coral"},
+            hover_data={"coefficient": ":.4f", "VIP": ":.4f", "sign": True},
+            category_orders={"feature": df["feature"].tolist()}  # Preserve VIP order
         )
-        fig.update_layout(xaxis_title="Feature", yaxis_title="VIP score")
+        fig.update_layout(
+            xaxis_title="Feature", 
+            yaxis_title="VIP score",
+            legend_title="Coefficient Sign"
+        )
         return fig
 
     def plot_cv_scores(self, use_rmse=True):
