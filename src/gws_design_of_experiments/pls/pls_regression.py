@@ -266,9 +266,8 @@ class AutomaticPLSRegressor:
             color="sign",
             title="PLS VIP scores (colored by regresssion coefficient sign)",
             color_discrete_map={"+": "steelblue", "-": "coral"},
-            hover_data={"coefficient": ":.4f", "VIP": ":.4f", "sign": True},
+            hover_data={"VIP": ":.4f", "sign": True},
             category_orders={"feature": df["feature"].tolist()},  # Preserve VIP order
-            text=df["coefficient"].round(2)  # Add coefficient values as text
         )
         fig.update_traces(textposition='outside')  # Place text above bars
         fig.update_layout(
