@@ -14,14 +14,14 @@ from gws_design_of_experiments.random_forest.random_forest_regressor import Auto
 class RandomForestRegressorTask(Task):
     """
     Random Forest Regression Task with automatic hyperparameter tuning.
-    
+
     This task performs Random Forest regression with cross-validation to find optimal
     hyperparameters (n_estimators and max_depth). It provides comprehensive outputs
     including metrics, feature importances, and visualization plots.
-    
+
     Inputs:
         - data: Input table containing features and target variable
-        
+
     Outputs:
         - summary_table: Performance metrics (R², RMSE) for train and test sets
         - vip_table: Feature importance scores ranked by importance with correlation signs
@@ -29,7 +29,7 @@ class RandomForestRegressorTask(Task):
         - vip_plot: Bar plot of feature importances colored by correlation sign
         - plot_train_set: Predicted vs true values for training set
         - plot_test_set: Predicted vs true values for test set
-        
+
     Configuration:
         - target: Name of the target column to predict
         - columns_to_exclude: List of column names to exclude from analysis (optional)
@@ -60,14 +60,14 @@ class RandomForestRegressorTask(Task):
     def run(self, params: ConfigParams, inputs: TaskInputs) -> TaskOutputs:
         """
         Execute the Random Forest regression task.
-        
+
         Parameters
         ----------
         params : ConfigParams
             Configuration parameters including target, columns_to_exclude, and test_size
         inputs : TaskInputs
             Input data table
-            
+
         Returns
         -------
         TaskOutputs
@@ -129,7 +129,7 @@ class RandomForestRegressorTask(Task):
     def main(self, X, y, target_name, test_size):
         """
         Main execution logic for Random Forest regression.
-        
+
         Parameters
         ----------
         X : DataFrame or array
@@ -140,7 +140,7 @@ class RandomForestRegressorTask(Task):
             Name of the target variable
         test_size : float
             Proportion of data for testing
-            
+
         Returns
         -------
         tuple
@@ -159,10 +159,10 @@ class RandomForestRegressorTask(Task):
         rf_model.fit(X, y)
 
         metrics_df = rf_model.metrics_df
-        importance_df = rf_model.importance_df.head()
+        importance_df = rf_model.importance_df
 
         fig_cv = rf_model.plot_cv_scores()
-        fig_imp = rf_model.plot_feature_importances(top_n=10)
+        fig_imp = rf_model.plot_feature_importances(top_n=20)
         fig_train = rf_model.plot_predictions(split="train")
         fig_test = rf_model.plot_predictions(split="test")
 
