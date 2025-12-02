@@ -66,7 +66,11 @@ class CausalEffect(Task):
     input_specs = InputSpecs({'data': InputSpec(Table, human_name="Data",
                              short_description="Data",)})
     config_specs = ConfigSpecs({
-        'targets': ListParam(human_name="Target(s)", short_description="Target(s)",)})
+        'targets': ListParam(human_name="Target(s)", short_description="Target(s)",),
+        'columns_to_exclude': ListParam(
+            human_name="Columns to Exclude",
+            short_description="List of column names to exclude from causal analysis",
+            optional=True)})
     output_specs = OutputSpecs({'results_folder': OutputSpec(
         Folder, human_name="Results folder", short_description="The folder containing the results"), })
 
@@ -91,6 +95,12 @@ class CausalEffect(Task):
 
         # Load and prepare data
         df = inputs["data"].get_data()
+
+        # Get columns to exclude from config
+        columns_to_exclude = params.get('columns_to_exclude')
+        if columns_to_exclude:
+            df = df.drop(columns=columns_to_exclude, errors='ignore')
+
         df_numeric = df.select_dtypes(include='number').dropna()
 
         # Get targets from config

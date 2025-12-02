@@ -2,7 +2,7 @@ import os
 import pickle
 
 from gws_core import (ConfigParams, ConfigSpecs, Folder, InputSpec, InputSpecs,
-                      IntParam, JSONDict, MambaShellProxy, OutputSpec,
+                      IntParam, JSONDict, ListParam, MambaShellProxy, OutputSpec,
                       OutputSpecs, ParamSet, StrParam, Table, Task, TaskInputs,
                       TaskOutputs, TypingStyle, task_decorator)
 
@@ -56,6 +56,10 @@ class Optimization(Task):
     config_specs = ConfigSpecs({
         'population_size': IntParam(default_value=500, optional=False, human_name="Population size", short_description="Population size for the optimization algorithm"),
         'iterations': IntParam(default_value=100, optional=False, human_name="Iterations"),
+        'columns_to_exclude': ListParam(
+            human_name="Columns to Exclude",
+            short_description="List of column names to exclude from optimization analysis",
+            optional=True),
         'targets_thresholds': ParamSet(ConfigSpecs({
             'targets': StrParam(default_value=None, optional=False, human_name="Target", short_description="Target to optimize"),
             'thresholds': IntParam(default_value=None, optional=False, human_name="Objective", short_description="Objective value for the target"),
@@ -74,6 +78,11 @@ class Optimization(Task):
         # Get inputs
         data_filtered = inputs["data"].get_data()
         manual_constraints = inputs["manual_constraints"].get_data()
+
+        # Get columns to exclude from config
+        columns_to_exclude = params.get('columns_to_exclude')
+        if columns_to_exclude:
+            data_filtered = data_filtered.drop(columns=columns_to_exclude, errors='ignore')
 
         # Get parameters
         population_size = params.get("population_size")
