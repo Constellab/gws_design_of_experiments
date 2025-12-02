@@ -24,9 +24,9 @@ class RandomForestRegressorTask(Task):
         
     Outputs:
         - summary_table: Performance metrics (R², RMSE) for train and test sets
-        - vip_table: Feature importance scores ranked by importance
+        - vip_table: Feature importance scores ranked by importance with correlation signs
         - plot_estimators: Cross-validation performance vs hyperparameters
-        - vip_plot: Bar plot of feature importances
+        - vip_plot: Bar plot of feature importances colored by correlation sign
         - plot_train_set: Predicted vs true values for training set
         - plot_test_set: Predicted vs true values for test set
         

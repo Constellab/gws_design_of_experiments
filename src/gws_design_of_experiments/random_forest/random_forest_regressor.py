@@ -212,10 +212,35 @@ class AutomaticRandomForestRegressor:
 
         # ---------------- Feature importances ---------------- #
         importances = self.model_.feature_importances_
-        self.importance_df_ = pd.DataFrame({
-            "feature": self.feature_names_,
-            "importance": importances,
-        }).sort_values("importance", ascending=False).reset_index(drop=True)
+
+        # Compute correlation with predictions for directionality
+        X_train_arr = self.X_train_
+        y_hat = self.y_train_pred_
+
+        importance_rows = []
+        for j, fname in enumerate(self.feature_names_):
+            xj = X_train_arr[:, j]
+            # Handle constant columns / nan corr
+            if np.std(xj) == 0:
+                corr = 0.0
+            else:
+                corr = np.corrcoef(xj, y_hat)[0, 1]
+                if np.isnan(corr):
+                    corr = 0.0
+
+            imp = importances[j]
+            importance_rows.append({
+                "feature": fname,
+                "importance": imp,
+                "correlation": corr,
+                "sign": "+" if corr >= 0 else "-",
+            })
+
+        self.importance_df_ = (
+            pd.DataFrame(importance_rows)
+            .sort_values("importance", ascending=False)
+            .reset_index(drop=True)
+        )
 
         return self
 
@@ -237,7 +262,9 @@ class AutomaticRandomForestRegressor:
 
     def plot_feature_importances(self, top_n=None):
         """
-        Bar plot of feature importances.
+        Bar plot of feature importances with color coding based on correlation sign.
+        If top_n is provided, only show the top N features.
+        Features are displayed in order of importance (mixed +/- correlations).
         """
         if self.importance_df_ is None:
             raise RuntimeError("Model not fitted yet. Call .fit(X, y) first.")
@@ -246,15 +273,22 @@ class AutomaticRandomForestRegressor:
         if top_n is not None:
             df = df.head(top_n)
 
+        # Ensure features display in importance order (already sorted in importance_df_)
         fig = px.bar(
             df,
             x="feature",
             y="importance",
-            title="Random Forest feature importances",
+            color="sign",
+            title="Random Forest feature importances (colored by correlation sign)",
+            color_discrete_map={"+": "steelblue", "-": "coral"},
+            hover_data={"importance": ":.4f", "sign": True},
+            category_orders={"feature": df["feature"].tolist()},  # Preserve importance order
         )
+        fig.update_traces(textposition='outside')  # Place text above bars
         fig.update_layout(
             xaxis_title="Feature",
             yaxis_title="Importance",
+            legend_title="Correlation sign"
         )
         return fig
 
