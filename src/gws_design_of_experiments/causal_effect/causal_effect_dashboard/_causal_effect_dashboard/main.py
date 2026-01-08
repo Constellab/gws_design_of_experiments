@@ -1,12 +1,18 @@
 import os
-import pandas as pd
-import numpy as np
-from gws_design_of_experiments.causal_effect.causal_effect_task import CausalEffect
 
+import numpy as np
+import pandas as pd
 import streamlit as st
-from pages import single_effect_page, multiple_effect_page, settings_page
-from gws_design_of_experiments.causal_effect.causal_effect_dashboard._causal_effect_dashboard.causal_effect_state import CausalEffectState
 from gws_core.streamlit import StreamlitRouter
+from gws_design_of_experiments.causal_effect.causal_effect_dashboard._causal_effect_dashboard.causal_effect_state import (
+    CausalEffectState,
+)
+from gws_design_of_experiments.causal_effect.causal_effect_dashboard._causal_effect_dashboard.pages import (
+    multiple_effect_page,
+    settings_page,
+    single_effect_page,
+)
+from gws_design_of_experiments.causal_effect.causal_effect_task import CausalEffect
 
 sources: list
 params: dict
@@ -39,7 +45,7 @@ def load_data(folder_path: str) -> pd.DataFrame:
                 combinaison = os.path.basename(root)
                 df = pd.read_csv(path)
                 df["Combinaison"] = combinaison
-                df[f"{CausalEffect.TARGET_NAME}_Combo"] = df[CausalEffect.TARGET_NAME] + " [" + combinaison + "]"
+                df[f"{CausalEffect.TARGET_NAME}_Combo"] = df[CausalEffect.TARGET_NAME].astype(str) + " [" + combinaison + "]"
                 all_results.append(df)
 
     if all_results:
@@ -63,7 +69,6 @@ def show_sidebar():
     df_temp = df_all[df_all["Combinaison"]== CausalEffectState.get_combinations()]
     traitement_stats = df_temp.groupby(CausalEffect.TREATMENT_NAME)[CausalEffect.AVERAGE_CAUSAL_EFFECT_NAME].apply(lambda x: (x != 0).any())
     traitements_valides = sorted(traitement_stats[traitement_stats].index.tolist())
-    traitements = sorted(df_all[CausalEffect.TREATMENT_NAME].unique())
 
     # Filtrage selon combinaison + traitement
     df_filtre = df_all[

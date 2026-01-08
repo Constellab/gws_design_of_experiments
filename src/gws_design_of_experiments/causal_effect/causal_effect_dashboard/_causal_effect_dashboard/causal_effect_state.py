@@ -1,19 +1,18 @@
-from typing import List
-import pandas as pd
-import streamlit as st
 import json
 import os
 
+import pandas as pd
+import streamlit as st
+
+
 class CausalEffectState:
-    """Class to manage the state of the app.
-    """
+    """Class to manage the state of the app."""
 
     COMBINATIONS_KEY = "combinations_selectbox"
     DF_FILTERED_KEY = "df_filtered"
     INPUT_FOLDER_KEY = "input_folder"
     SETTINGS_KEY = "settings"
     COMBINATION_SEPARATOR = "|"
-
 
     ###### Getters and Setters for the state ######
 
@@ -52,7 +51,7 @@ class CausalEffectState:
         if input_folder:
             settings_path = os.path.join(input_folder, "settings.json")
             if os.path.exists(settings_path):
-                with open(settings_path, 'r') as f:
+                with open(settings_path) as f:
                     settings = json.load(f)
                     cls.set_settings(settings)
                     return settings
@@ -70,6 +69,6 @@ class CausalEffectState:
         return cls.COMBINATION_SEPARATOR in combination
 
     @classmethod
-    def get_targets_from_combination(cls, combination: str) -> List[str]:
+    def get_targets_from_combination(cls, combination: str) -> list[str]:
         """Extract individual target names from a combination string"""
         return combination.split(cls.COMBINATION_SEPARATOR)

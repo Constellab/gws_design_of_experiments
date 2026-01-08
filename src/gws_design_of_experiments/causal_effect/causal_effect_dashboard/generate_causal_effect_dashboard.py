@@ -1,22 +1,40 @@
-import os
 import json
-from gws_core import (ConfigParams, AppConfig, AppType, OutputSpec,
-                      OutputSpecs, StreamlitResource, Task, TaskInputs,
-                      TaskOutputs, app_decorator, task_decorator,
-                      InputSpecs, ConfigSpecs, Folder, InputSpec)
+import os
 
-@app_decorator("CausalEffectDashboardDashboard", app_type=AppType.STREAMLIT,
-               human_name="Generate AppConfig")
+from gws_core import (
+    AppConfig,
+    AppType,
+    ConfigParams,
+    ConfigSpecs,
+    Folder,
+    InputSpec,
+    InputSpecs,
+    OutputSpec,
+    OutputSpecs,
+    StreamlitResource,
+    Task,
+    TaskInputs,
+    TaskOutputs,
+    app_decorator,
+    task_decorator,
+)
+
+
+@app_decorator(
+    "CausalEffectDashboardDashboard", app_type=AppType.STREAMLIT, human_name="Generate AppConfig"
+)
 class CausalEffectDashboard(AppConfig):
-
     # retrieve the path of the app folder, relative to this file
     # the dashboard code folder starts with a underscore to avoid being loaded when the brick is loaded
     def get_app_folder_path(self):
         return self.get_app_folder_from_relative_path(__file__, "_causal_effect_dashboard")
 
 
-@task_decorator("GenerateCausalEffectDashboard", human_name="Generate causal effect dashboard app",
-                style=StreamlitResource.copy_style())
+@task_decorator(
+    "GenerateCausalEffectDashboard",
+    human_name="Generate causal effect dashboard app",
+    style=StreamlitResource.copy_style(),
+)
 class GenerateCausalEffectDashboard(Task):
     """
     Task that generates an interactive Streamlit dashboard for visualizing and exploring
@@ -68,33 +86,34 @@ class GenerateCausalEffectDashboard(Task):
 
     """
 
-    input_specs = InputSpecs({'folder': InputSpec(Folder)})
-    output_specs = OutputSpecs({
-        'streamlit_app': OutputSpec(StreamlitResource)
-    })
+    input_specs = InputSpecs({"folder": InputSpec(Folder)})
+    output_specs = OutputSpecs({"streamlit_app": OutputSpec(StreamlitResource)})
 
     config_specs = ConfigSpecs({})
 
     def run(self, params: ConfigParams, inputs: TaskInputs) -> TaskOutputs:
-        """ Run the task """
+        """Run the task"""
 
         streamlit_app = StreamlitResource()
 
         # set the input in the streamlit resource
-        folder: Folder = inputs.get('folder')
+        folder: Folder = inputs.get("folder")
 
         # Create settings.json if it doesn't exist
         settings_path = os.path.join(folder.path, "settings.json")
         if not os.path.exists(settings_path):
             # Get all subdirectories in the folder
-            subfolders = [name for name in os.listdir(folder.path)
-                         if os.path.isdir(os.path.join(folder.path, name))]
+            subfolders = [
+                name
+                for name in os.listdir(folder.path)
+                if os.path.isdir(os.path.join(folder.path, name))
+            ]
 
             # Create settings dictionary with subfolder names as keys and values
             settings = {subfolder: subfolder for subfolder in subfolders}
 
             # Write settings.json file
-            with open(settings_path, 'w') as f:
+            with open(settings_path, "w") as f:
                 json.dump(settings, f, indent=2)
 
         streamlit_app.add_resource(folder, create_new_resource=False)

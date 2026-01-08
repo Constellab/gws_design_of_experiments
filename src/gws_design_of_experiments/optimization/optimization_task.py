@@ -1,17 +1,37 @@
 import os
 import pickle
 
-from gws_core import (ConfigParams, ConfigSpecs, Folder, InputSpec, InputSpecs,
-                      IntParam, JSONDict, ListParam, MambaShellProxy, OutputSpec,
-                      OutputSpecs, ParamSet, StrParam, Table, Task, TaskInputs,
-                      TaskOutputs, TypingStyle, task_decorator)
+from gws_core import (
+    ConfigParams,
+    ConfigSpecs,
+    Folder,
+    InputSpec,
+    InputSpecs,
+    IntParam,
+    JSONDict,
+    ListParam,
+    MambaShellProxy,
+    OutputSpec,
+    OutputSpecs,
+    ParamSet,
+    StrParam,
+    Table,
+    Task,
+    TaskInputs,
+    TaskOutputs,
+    TypingStyle,
+    task_decorator,
+)
 
 from .optimization_env_helper import OptimizationEnvHelper
 
 
-@task_decorator("Optimization", human_name="Optimization", short_description="Optimization with virtual environment",
-                style=TypingStyle.material_icon(material_icon_name="auto_mode",
-                                                background_color="#5acce9"))
+@task_decorator(
+    "Optimization",
+    human_name="Optimization",
+    short_description="Optimization with virtual environment",
+    style=TypingStyle.material_icon(material_icon_name="auto_mode", background_color="#5acce9"),
+)
 class Optimization(Task):
     """
     Optimization task using machine learning models in isolated virtual environment.
@@ -50,44 +70,88 @@ class Optimization(Task):
         yield of 80% and minimum purity of 95%.
     """
 
-    input_specs = InputSpecs({'data': InputSpec(Table, human_name="Data", short_description="Data",),
-                              'manual_constraints': InputSpec(JSONDict, human_name="Manual constraints",
-                                                              short_description="Manual constraints for optimization")})
-    config_specs = ConfigSpecs({
-        'population_size': IntParam(default_value=500, optional=False, human_name="Population size", short_description="Population size for the optimization algorithm"),
-        'iterations': IntParam(default_value=100, optional=False, human_name="Iterations"),
-        'columns_to_exclude': ListParam(
-            human_name="Columns to Exclude",
-            short_description="List of column names to exclude from optimization analysis",
-            optional=True),
-        'targets_thresholds': ParamSet(ConfigSpecs({
-            'targets': StrParam(default_value=None, optional=False, human_name="Target", short_description="Target to optimize"),
-            'thresholds': IntParam(default_value=None, optional=False, human_name="Objective", short_description="Objective value for the target"),
-        }), optional=False, human_name="Targets with objectives", short_description="Targets to optimize and their objective values")
-    })
+    input_specs = InputSpecs(
+        {
+            "data": InputSpec(
+                Table,
+                human_name="Data",
+                short_description="Data",
+            ),
+            "manual_constraints": InputSpec(
+                JSONDict,
+                human_name="Manual constraints",
+                short_description="Manual constraints for optimization",
+            ),
+        }
+    )
+    config_specs = ConfigSpecs(
+        {
+            "population_size": IntParam(
+                default_value=500,
+                optional=False,
+                human_name="Population size",
+                short_description="Population size for the optimization algorithm",
+            ),
+            "iterations": IntParam(default_value=100, optional=False, human_name="Iterations"),
+            "columns_to_exclude": ListParam(
+                human_name="Columns to Exclude",
+                short_description="List of column names to exclude from optimization analysis",
+                optional=True,
+            ),
+            "targets_thresholds": ParamSet(
+                ConfigSpecs(
+                    {
+                        "targets": StrParam(
+                            default_value=None,
+                            optional=False,
+                            human_name="Target",
+                            short_description="Target to optimize",
+                        ),
+                        "thresholds": IntParam(
+                            default_value=None,
+                            optional=False,
+                            human_name="Objective",
+                            short_description="Objective value for the target",
+                        ),
+                    }
+                ),
+                optional=False,
+                human_name="Targets with objectives",
+                short_description="Targets to optimize and their objective values",
+            ),
+        }
+    )
 
-    output_specs = OutputSpecs({'results_folder': OutputSpec(
-        Folder, human_name="Results folder", short_description="The folder containing the results"), })
+    output_specs = OutputSpecs(
+        {
+            "results_folder": OutputSpec(
+                Folder,
+                human_name="Results folder",
+                short_description="The folder containing the results",
+            ),
+        }
+    )
 
     def run(self, params: ConfigParams, inputs: TaskInputs) -> TaskOutputs:
         """Run the optimization task in virtual environment."""
         # Create shell proxy for optimization environment
-        shell_proxy: MambaShellProxy = OptimizationEnvHelper.create_proxy(
-            self.message_dispatcher)
+        shell_proxy: MambaShellProxy = OptimizationEnvHelper.create_proxy(self.message_dispatcher)
 
         # Get inputs
         data_filtered = inputs["data"].get_data()
         manual_constraints = inputs["manual_constraints"].get_data()
 
         # Get columns to exclude from config
-        columns_to_exclude = params.get('columns_to_exclude')
+        columns_to_exclude = params.get("columns_to_exclude")
         if columns_to_exclude:
-            data_filtered = data_filtered.drop(columns=columns_to_exclude, errors='ignore')
+            data_filtered = data_filtered.drop(columns=columns_to_exclude, errors="ignore")
 
         # Get parameters
         population_size = params.get("population_size")
         iterations = params.get("iterations")
-        full_thresholds = {target['targets']: target['thresholds'] for target in params.get("targets_thresholds")}
+        full_thresholds = {
+            target["targets"]: target["thresholds"] for target in params.get("targets_thresholds")
+        }
 
         # Prepare data
         columns_data = data_filtered.columns.tolist()
@@ -95,7 +159,9 @@ class Optimization(Task):
 
         # Define targets
         optimization_targets = list(full_thresholds.keys())
-        optimization_targets_all = [col for col in columns_data if col not in manual_constraints_name]
+        optimization_targets_all = [
+            col for col in columns_data if col not in manual_constraints_name
+        ]
 
         # Filter thresholds for selected targets
         output_thresholds = {k: full_thresholds[k] for k in optimization_targets}
@@ -109,14 +175,14 @@ class Optimization(Task):
 
         # Prepare input data for virtual environment
         input_data = {
-            'data_filtered': data_filtered,
-            'optimization_targets': optimization_targets,
-            'full_thresholds': full_thresholds,
-            'output_thresholds': output_thresholds,
-            'population_size': population_size,
-            'iterations': iterations,
-            'manual_constraints': manual_constraints,
-            'add_cv_as_penalty': True
+            "data_filtered": data_filtered,
+            "optimization_targets": optimization_targets,
+            "full_thresholds": full_thresholds,
+            "output_thresholds": output_thresholds,
+            "population_size": population_size,
+            "iterations": iterations,
+            "manual_constraints": manual_constraints,
+            "add_cv_as_penalty": True,
         }
 
         # Create temporary files for input/output
@@ -125,7 +191,7 @@ class Optimization(Task):
 
         # Save input data
         self.log_info_message("Saving input data for virtual environment")
-        with open(input_file, 'wb') as f:
+        with open(input_file, "wb") as f:
             pickle.dump(input_data, f)
 
         # Get path to the optimization script
@@ -145,5 +211,5 @@ class Optimization(Task):
         folder_results.name = "Optimization Results"
 
         return {
-            'results_folder': folder_results,
+            "results_folder": folder_results,
         }

@@ -1,21 +1,39 @@
-from gws_core import (ConfigParams, AppConfig, AppType, OutputSpec,
-                      OutputSpecs, StreamlitResource, Task, TaskInputs,
-                      TaskOutputs, app_decorator, task_decorator,
-                      InputSpecs, ConfigSpecs, InputSpec, Folder)
+from gws_core import (
+    AppConfig,
+    AppType,
+    ConfigParams,
+    ConfigSpecs,
+    Folder,
+    InputSpec,
+    InputSpecs,
+    OutputSpec,
+    OutputSpecs,
+    StreamlitResource,
+    Task,
+    TaskInputs,
+    TaskOutputs,
+    app_decorator,
+    task_decorator,
+)
 
 
-@app_decorator("OptimizationDashboardAppConfig", app_type=AppType.STREAMLIT,
-               human_name="Generate show case app")
+@app_decorator(
+    "OptimizationDashboardAppConfig",
+    app_type=AppType.STREAMLIT,
+    human_name="Generate show case app",
+)
 class OptimizationDashboardAppConfig(AppConfig):
-
     # retrieve the path of the app folder, relative to this file
     # the app code folder starts with a underscore to avoid being loaded when the brick is loaded
     def get_app_folder_path(self):
         return self.get_app_folder_from_relative_path(__file__, "_optimization_dashboard")
 
 
-@task_decorator("GenerateOptimizationDashboard", human_name="Generate OptimizationDashboard app",
-                style=StreamlitResource.copy_style())
+@task_decorator(
+    "GenerateOptimizationDashboard",
+    human_name="Generate OptimizationDashboard app",
+    style=StreamlitResource.copy_style(),
+)
 class GenerateOptimizationDashboard(Task):
     """
     Task that generates an interactive Streamlit dashboard for optimization results visualization.
@@ -48,20 +66,18 @@ class GenerateOptimizationDashboard(Task):
         decisions based on the optimization outcomes.
     """
 
-    input_specs = InputSpecs({'folder': InputSpec(Folder)})
-    output_specs = OutputSpecs({
-        'streamlit_app': OutputSpec(StreamlitResource)
-    })
+    input_specs = InputSpecs({"folder": InputSpec(Folder)})
+    output_specs = OutputSpecs({"streamlit_app": OutputSpec(StreamlitResource)})
 
     config_specs = ConfigSpecs({})
 
     def run(self, params: ConfigParams, inputs: TaskInputs) -> TaskOutputs:
-        """ Run the task """
+        """Run the task"""
 
         streamlit_app = StreamlitResource()
 
         # set the input in the streamlit resource
-        folder: Folder = inputs.get('folder')
+        folder: Folder = inputs.get("folder")
         streamlit_app.add_resource(folder, create_new_resource=False)
 
         streamlit_app.set_app_config(OptimizationDashboardAppConfig())

@@ -11,13 +11,10 @@ class OptimizationEnvHelper:
     """Helper class to manage the optimization virtual environment."""
 
     unique_env_name = "OptimizationEnvTask"
-    env_file_path = os.path.join(
-        os.path.abspath(os.path.dirname(__file__)),
-        "optimization_env.yml"
-    )
+    env_file_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), "optimization_env.yml")
 
     @classmethod
-    def create_proxy(cls, message_dispatcher: MessageDispatcher = None) -> MambaShellProxy:
+    def create_proxy(cls, message_dispatcher: MessageDispatcher | None = None) -> MambaShellProxy:
         """
         Create a MambaShellProxy for the optimization environment.
 
@@ -27,8 +24,10 @@ class OptimizationEnvHelper:
         Returns:
             MambaShellProxy instance configured for optimization environment
         """
-        return MambaShellProxy(
-            env_file_path=cls.env_file_path,
-            env_name=cls.unique_env_name,
-            message_dispatcher=message_dispatcher
-        )
+        if message_dispatcher is not None:
+            return MambaShellProxy(
+                env_file_path=cls.env_file_path,
+                env_name=cls.unique_env_name,
+                message_dispatcher=message_dispatcher,
+            )
+        return MambaShellProxy(env_file_path=cls.env_file_path, env_name=cls.unique_env_name)

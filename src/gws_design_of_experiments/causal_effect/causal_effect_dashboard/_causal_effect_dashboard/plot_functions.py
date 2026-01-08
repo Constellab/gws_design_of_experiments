@@ -1,12 +1,16 @@
-import streamlit as st
+import numpy as np
 import pandas as pd
 import plotly.express as px
-import numpy as np
-from typing import List
-from gws_design_of_experiments.causal_effect.causal_effect_dashboard._causal_effect_dashboard.causal_effect_state import CausalEffectState
+import streamlit as st
+from gws_design_of_experiments.causal_effect.causal_effect_dashboard._causal_effect_dashboard.causal_effect_state import (
+    CausalEffectState,
+)
 from gws_design_of_experiments.causal_effect.causal_effect_task import CausalEffect
 
-def display_barplot(df_filtered : pd.DataFrame, thresholds: bool, treatment_order : List = None):
+
+def display_barplot(
+    df_filtered: pd.DataFrame, thresholds: bool, treatment_order: list | None = None
+):
     if thresholds:
         # Calculate min and max values for slider ranges
         all_values = df_filtered[CausalEffect.AVERAGE_CAUSAL_EFFECT_NAME]
@@ -26,7 +30,7 @@ def display_barplot(df_filtered : pd.DataFrame, thresholds: bool, treatment_orde
                     max_value=max_negative,
                     value=(min_negative, max_negative),
                     step=step_negative,
-                    key="negative_threshold"
+                    key="negative_threshold",
                 )
             else:
                 negative_threshold = (0.0, 0.0)
@@ -43,7 +47,7 @@ def display_barplot(df_filtered : pd.DataFrame, thresholds: bool, treatment_orde
                     max_value=max_positive,
                     value=(min_positive, max_positive),
                     step=step_positive,
-                    key="positive_threshold"
+                    key="positive_threshold",
                 )
             else:
                 positive_threshold = (0.0, 0.0)
@@ -51,28 +55,48 @@ def display_barplot(df_filtered : pd.DataFrame, thresholds: bool, treatment_orde
 
         # Filter data based on thresholds
         df_filtered = df_filtered[
-            ((df_filtered[CausalEffect.AVERAGE_CAUSAL_EFFECT_NAME] >= negative_threshold[0]) &
-            (df_filtered[CausalEffect.AVERAGE_CAUSAL_EFFECT_NAME] <= negative_threshold[1])) |
-            ((df_filtered[CausalEffect.AVERAGE_CAUSAL_EFFECT_NAME] >= positive_threshold[0]) &
-            (df_filtered[CausalEffect.AVERAGE_CAUSAL_EFFECT_NAME] <= positive_threshold[1]))
+            (
+                (df_filtered[CausalEffect.AVERAGE_CAUSAL_EFFECT_NAME] >= negative_threshold[0])
+                & (df_filtered[CausalEffect.AVERAGE_CAUSAL_EFFECT_NAME] <= negative_threshold[1])
+            )
+            | (
+                (df_filtered[CausalEffect.AVERAGE_CAUSAL_EFFECT_NAME] >= positive_threshold[0])
+                & (df_filtered[CausalEffect.AVERAGE_CAUSAL_EFFECT_NAME] <= positive_threshold[1])
+            )
         ]
 
     # Apply display names to treatment order
     if treatment_order:
-        treatment_order_display = [CausalEffectState.get_display_name(name) for name in treatment_order]
+        treatment_order_display = [
+            CausalEffectState.get_display_name(name) for name in treatment_order
+        ]
     else:
         # We ranked the values manually
         # Calculate mean absolute effect for each treatment to determine order
-        treatment_order = df_filtered.groupby(CausalEffect.TREATMENT_NAME)[CausalEffect.AVERAGE_CAUSAL_EFFECT_NAME].apply(
-            lambda x: np.mean(np.abs(x))
-        ).sort_values(ascending=False).index.tolist()
-        treatment_order_display = [CausalEffectState.get_display_name(name) for name in treatment_order]
+        treatment_order = (
+            df_filtered.groupby(CausalEffect.TREATMENT_NAME)[
+                CausalEffect.AVERAGE_CAUSAL_EFFECT_NAME
+            ]
+            .apply(lambda x: np.mean(np.abs(x)))
+            .sort_values(ascending=False)
+            .index.tolist()
+        )
+        treatment_order_display = [
+            CausalEffectState.get_display_name(name) for name in treatment_order
+        ]
 
     # Create a copy of the dataframe with display names
     df_display = df_filtered.copy()
-    df_display[CausalEffect.TREATMENT_NAME + "_Display"] = df_display[CausalEffect.TREATMENT_NAME].apply(CausalEffectState.get_display_name)
-    df_display[f"{CausalEffect.TARGET_NAME}_Combo_Display"] = df_display[f"{CausalEffect.TARGET_NAME}_Combo"].apply(
-        lambda x: CausalEffectState.get_display_name(x.split(" [")[0]) + " [" + CausalEffectState.get_display_name(x.split(" [")[1].rstrip("]")) + "]"
+    df_display[CausalEffect.TREATMENT_NAME + "_Display"] = df_display[
+        CausalEffect.TREATMENT_NAME
+    ].apply(CausalEffectState.get_display_name)
+    df_display[f"{CausalEffect.TARGET_NAME}_Combo_Display"] = df_display[
+        f"{CausalEffect.TARGET_NAME}_Combo"
+    ].apply(
+        lambda x: CausalEffectState.get_display_name(x.split(" [")[0])
+        + " ["
+        + CausalEffectState.get_display_name(x.split(" [")[1].rstrip("]"))
+        + "]"
     )
 
     fig = px.bar(
@@ -84,13 +108,10 @@ def display_barplot(df_filtered : pd.DataFrame, thresholds: bool, treatment_orde
         title="CATE by treatment and target",
         labels={
             CausalEffect.AVERAGE_CAUSAL_EFFECT_NAME: "Effect (log scale)",
-            CausalEffect.TREATMENT_NAME + "_Display": "Treatment"
+            CausalEffect.TREATMENT_NAME + "_Display": "Treatment",
         },
-        category_orders={CausalEffect.TREATMENT_NAME + "_Display": treatment_order_display}
+        category_orders={CausalEffect.TREATMENT_NAME + "_Display": treatment_order_display},
     )
 
-    fig.update_layout(
-        xaxis_tickangle=-45
-    )
+    fig.update_layout(xaxis_tickangle=-45)
     st.plotly_chart(fig, use_container_width=True)
-

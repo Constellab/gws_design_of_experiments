@@ -1,17 +1,33 @@
 import os
 import pickle
 
-from gws_core import (ConfigParams, ConfigSpecs, Folder, InputSpec, InputSpecs,
-                      ListParam, MambaShellProxy, OutputSpec, OutputSpecs,
-                      Table, Task, TaskInputs, TaskOutputs, TypingStyle,
-                      task_decorator)
+from gws_core import (
+    ConfigParams,
+    ConfigSpecs,
+    Folder,
+    InputSpec,
+    InputSpecs,
+    ListParam,
+    MambaShellProxy,
+    OutputSpec,
+    OutputSpecs,
+    Table,
+    Task,
+    TaskInputs,
+    TaskOutputs,
+    TypingStyle,
+    task_decorator,
+)
 
 from .econml_env_helper import EconmlEnvHelper
 
 
-@task_decorator("CausalEffect", human_name="Causal Effect", short_description="Causal Effect",
-                style=TypingStyle.material_icon(material_icon_name="gradient",
-                                                background_color="#f17093"))
+@task_decorator(
+    "CausalEffect",
+    human_name="Causal Effect",
+    short_description="Causal Effect",
+    style=TypingStyle.material_icon(material_icon_name="gradient", background_color="#f17093"),
+)
 class CausalEffect(Task):
     """
     CausalEffect task performs causal inference analysis to estimate the causal effects
@@ -63,16 +79,37 @@ class CausalEffect(Task):
     and potential unmeasured confounders.
     """
 
-    input_specs = InputSpecs({'data': InputSpec(Table, human_name="Data",
-                             short_description="Data",)})
-    config_specs = ConfigSpecs({
-        'targets': ListParam(human_name="Target(s)", short_description="Target(s)",),
-        'columns_to_exclude': ListParam(
-            human_name="Columns to Exclude",
-            short_description="List of column names to exclude from causal analysis",
-            optional=True)})
-    output_specs = OutputSpecs({'results_folder': OutputSpec(
-        Folder, human_name="Results folder", short_description="The folder containing the results"), })
+    input_specs = InputSpecs(
+        {
+            "data": InputSpec(
+                Table,
+                human_name="Data",
+                short_description="Data",
+            )
+        }
+    )
+    config_specs = ConfigSpecs(
+        {
+            "targets": ListParam(
+                human_name="Target(s)",
+                short_description="Target(s)",
+            ),
+            "columns_to_exclude": ListParam(
+                human_name="Columns to Exclude",
+                short_description="List of column names to exclude from causal analysis",
+                optional=True,
+            ),
+        }
+    )
+    output_specs = OutputSpecs(
+        {
+            "results_folder": OutputSpec(
+                Folder,
+                human_name="Results folder",
+                short_description="The folder containing the results",
+            ),
+        }
+    )
 
     TREATMENT_NAME = "Treatment"
     TARGET_NAME = "Target"
@@ -88,8 +125,7 @@ class CausalEffect(Task):
 
     def run(self, params: ConfigParams, inputs: TaskInputs) -> TaskOutputs:
         # Create shell proxy for econml environment
-        shell_proxy: MambaShellProxy = EconmlEnvHelper.create_proxy(
-            self.message_dispatcher)
+        shell_proxy: MambaShellProxy = EconmlEnvHelper.create_proxy(self.message_dispatcher)
 
         self.update_progress_value(5, message="Preparing data for virtual environment")
 
@@ -97,20 +133,17 @@ class CausalEffect(Task):
         df = inputs["data"].get_data()
 
         # Get columns to exclude from config
-        columns_to_exclude = params.get('columns_to_exclude')
+        columns_to_exclude = params.get("columns_to_exclude")
         if columns_to_exclude:
-            df = df.drop(columns=columns_to_exclude, errors='ignore')
+            df = df.drop(columns=columns_to_exclude, errors="ignore")
 
-        df_numeric = df.select_dtypes(include='number').dropna()
+        df_numeric = df.select_dtypes(include="number").dropna()
 
         # Get targets from config
-        target_all = params.get('targets')
+        target_all = params.get("targets")
 
         # Prepare input data for virtual environment
-        input_data = {
-            'dataframe': df_numeric,
-            'targets': target_all
-        }
+        input_data = {"dataframe": df_numeric, "targets": target_all}
 
         # Create temporary files for input/output
         input_file = os.path.join(shell_proxy.working_dir, "causal_input.pkl")
@@ -118,7 +151,7 @@ class CausalEffect(Task):
 
         # Save input data
         self.log_info_message("Saving input data for virtual environment")
-        with open(input_file, 'wb') as f:
+        with open(input_file, "wb") as f:
             pickle.dump(input_data, f)
 
         # Get path to the analysis script
@@ -144,5 +177,5 @@ class CausalEffect(Task):
         self.update_progress_value(100, message="Causal effect analysis completed")
 
         return {
-            'results_folder': folder_results,
+            "results_folder": folder_results,
         }

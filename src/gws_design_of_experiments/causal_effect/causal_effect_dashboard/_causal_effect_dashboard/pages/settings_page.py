@@ -1,19 +1,21 @@
-import streamlit as st
-import os
 import json
-from gws_design_of_experiments.causal_effect.causal_effect_task import CausalEffect
-from gws_design_of_experiments.causal_effect.causal_effect_dashboard._causal_effect_dashboard.causal_effect_state import CausalEffectState
-from gws_core.streamlit import StreamlitContainers
+import os
 
+import streamlit as st
+from gws_design_of_experiments.causal_effect.causal_effect_dashboard._causal_effect_dashboard.causal_effect_state import (
+    CausalEffectState,
+)
 
 
 def render_settings_page():
-    st.write("Change the display of your variables in the dashboard by defining the settings below.")
+    st.write(
+        "Change the display of your variables in the dashboard by defining the settings below."
+    )
 
     input_folder = CausalEffectState.get_input_folder()
     settings_path = os.path.join(input_folder, "settings.json")
     # Load settings
-    with open(settings_path, 'r') as f:
+    with open(settings_path) as f:
         settings = json.load(f)
 
     # Create input fields for each setting
@@ -34,10 +36,7 @@ def render_settings_page():
             st.text(key)
         with cols[1]:
             new_value = st.text_input(
-                label="",
-                value=str(value),
-                key=f"setting_{key}",
-                label_visibility="collapsed"
+                label="", value=str(value), key=f"setting_{key}", label_visibility="collapsed"
             )
             updated_settings[key] = new_value
 
@@ -47,6 +46,6 @@ def render_settings_page():
 
     # Save updated settings if any changes were made
     if settings_changed:
-        with open(settings_path, 'w') as f:
+        with open(settings_path, "w") as f:
             json.dump(updated_settings, f, indent=2)
         st.rerun()

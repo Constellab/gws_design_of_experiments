@@ -1,7 +1,7 @@
-
-
 import streamlit as st
-from pages import optimization_page
+from gws_design_of_experiments.optimization.optimization_dashboard._optimization_dashboard.pages.optimization_page import (
+    render_first_page,
+)
 
 sources: list
 params: dict
@@ -14,7 +14,7 @@ if sources:
     folder_results = sources[0].path
 
 def _render_first_page():
-    optimization_page.render_first_page(folder_results)
+    render_first_page(folder_results)
 
 
 _first_page = st.Page(_render_first_page, title='First page', url_path='first-page', icon='📦')

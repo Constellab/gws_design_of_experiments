@@ -1,10 +1,11 @@
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import train_test_split, KFold, cross_val_score
-from sklearn.metrics import r2_score, mean_squared_error
 import plotly.express as px
 import plotly.graph_objects as go
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.model_selection import KFold, cross_val_score, train_test_split
+
 
 class AutomaticRandomForestRegressor:
     """
@@ -24,12 +25,12 @@ class AutomaticRandomForestRegressor:
 
     def __init__(
         self,
-        test_size=None,              # e.g. 0.2; if None -> no test set
+        test_size=None,  # e.g. 0.2; if None -> no test set
         n_splits=5,
-        param_grid=None,             # dict with lists: {"n_estimators": [...], "max_depth": [...]}
+        param_grid=None,  # dict with lists: {"n_estimators": [...], "max_depth": [...]}
         random_state=42,
-        n_jobs=-1,                   # for RandomForestRegressor
-        target_name=None,            # explicit target name
+        n_jobs=-1,  # for RandomForestRegressor
+        target_name=None,  # explicit target name
     ):
         self.test_size = test_size
         self.n_splits = n_splits
@@ -54,9 +55,9 @@ class AutomaticRandomForestRegressor:
         self.metrics_df_ = None
         self.importance_df_ = None
 
-        self.X_train_ = None
+        self.x_train_ = None
         self.y_train_ = None
-        self.X_test_ = None
+        self.x_test_ = None
         self.y_test_ = None
 
         self.y_train_pred_ = None
@@ -66,7 +67,7 @@ class AutomaticRandomForestRegressor:
 
     # -------------------- FIT -------------------- #
 
-    def fit(self, X, y):
+    def fit(self, x, y):
         """
         Fit RandomForestRegressor with cross-validation over the param grid
         and compute metrics and feature importances.
@@ -74,12 +75,12 @@ class AutomaticRandomForestRegressor:
         Assumes 1D target y (single-output regression).
         """
         # Feature names
-        if hasattr(X, "columns"):
-            self.feature_names_ = list(X.columns)
+        if hasattr(x, "columns"):
+            self.feature_names_ = list(x.columns)
         else:
-            self.feature_names_ = [f"x{i}" for i in range(np.asarray(X).shape[1])]
+            self.feature_names_ = [f"x{i}" for i in range(np.asarray(x).shape[1])]
 
-        X = np.asarray(X, dtype=float)
+        x = np.asarray(x, dtype=float)
 
         # Target name - use override if provided, otherwise try to get from y
         if self._target_name_override is not None:
@@ -100,19 +101,18 @@ class AutomaticRandomForestRegressor:
 
         # Optional train/test split
         if self.test_size is not None and self.test_size > 0:
-            X_train, X_test, y_train, y_test = train_test_split(
-                X,
+            x_train, x_test, y_train, y_test = train_test_split(
+                x,
                 y,
                 test_size=self.test_size,
                 random_state=self.random_state,
             )
         else:
-            X_train, y_train = X, y
-            X_test = y_test = None
+            x_train, y_train = x, y
+            x_test = y_test = None
 
-        self.X_train_, self.y_train_ = X_train, y_train
-        self.X_test_, self.y_test_ = X_test, y_test
-
+        self.x_train_, self.y_train_ = x_train, y_train
+        self.x_test_, self.y_test_ = x_test, y_test
         # ---------------- Cross-validation over param grid ---------------- #
         kf = KFold(n_splits=self.n_splits, shuffle=True, random_state=self.random_state)
 
@@ -131,7 +131,7 @@ class AutomaticRandomForestRegressor:
                 )
                 scores = cross_val_score(
                     rf,
-                    X_train,
+                    x_train,
                     y_train,
                     cv=kf,
                     scoring="neg_mean_squared_error",
@@ -141,14 +141,16 @@ class AutomaticRandomForestRegressor:
                 mean_rmse = np.sqrt(-mean_neg_mse)
                 std_rmse = np.sqrt(std_neg_mse) if std_neg_mse >= 0 else np.nan
 
-                rows.append({
-                    "n_estimators": n_est,
-                    "max_depth": max_d if max_d is not None else np.nan,
-                    "cv_neg_mse_mean": mean_neg_mse,
-                    "cv_neg_mse_std": std_neg_mse,
-                    "cv_rmse_mean": mean_rmse,
-                    "cv_rmse_std": std_rmse,
-                })
+                rows.append(
+                    {
+                        "n_estimators": n_est,
+                        "max_depth": max_d if max_d is not None else np.nan,
+                        "cv_neg_mse_mean": mean_neg_mse,
+                        "cv_neg_mse_std": std_neg_mse,
+                        "cv_rmse_mean": mean_rmse,
+                        "cv_rmse_std": std_rmse,
+                    }
+                )
 
         self.cv_results_df_ = pd.DataFrame(rows)
 
@@ -171,40 +173,44 @@ class AutomaticRandomForestRegressor:
             random_state=self.random_state,
             n_jobs=self.n_jobs,
         )
-        rf_best.fit(X_train, y_train)
+        rf_best.fit(x_train, y_train)
         self.model_ = rf_best
 
         # ---------------- Metrics ---------------- #
-        y_train_pred = self.model_.predict(X_train)
+        y_train_pred = self.model_.predict(x_train)
         self.y_train_pred_ = y_train_pred
 
         train_r2 = r2_score(y_train, y_train_pred)
         train_rmse = np.sqrt(mean_squared_error(y_train, y_train_pred))
 
-        rows_metrics = [{
-            "split": "train",
-            "target": self.target_name_,
-            "n_estimators": best_n_estimators,
-            "max_depth": best_max_depth,
-            "R2": train_r2,
-            "RMSE": train_rmse,
-        }]
+        rows_metrics = [
+            {
+                "split": "train",
+                "target": self.target_name_,
+                "n_estimators": best_n_estimators,
+                "max_depth": best_max_depth,
+                "R2": train_r2,
+                "RMSE": train_rmse,
+            }
+        ]
 
-        if X_test is not None:
-            y_test_pred = self.model_.predict(X_test)
+        if x_test is not None and y_test is not None:
+            y_test_pred = self.model_.predict(x_test)
             self.y_test_pred_ = y_test_pred
 
             test_r2 = r2_score(y_test, y_test_pred)
             test_rmse = np.sqrt(mean_squared_error(y_test, y_test_pred))
 
-            rows_metrics.append({
-                "split": "test",
-                "target": self.target_name_,
-                "n_estimators": best_n_estimators,
-                "max_depth": best_max_depth,
-                "R2": test_r2,
-                "RMSE": test_rmse,
-            })
+            rows_metrics.append(
+                {
+                    "split": "test",
+                    "target": self.target_name_,
+                    "n_estimators": best_n_estimators,
+                    "max_depth": best_max_depth,
+                    "R2": test_r2,
+                    "RMSE": test_rmse,
+                }
+            )
         else:
             self.y_test_pred_ = None
 
@@ -214,12 +220,12 @@ class AutomaticRandomForestRegressor:
         importances = self.model_.feature_importances_
 
         # Compute correlation with predictions for directionality
-        X_train_arr = self.X_train_
+        x_train_arr = self.x_train_
         y_hat = self.y_train_pred_
 
         importance_rows = []
         for j, fname in enumerate(self.feature_names_):
-            xj = X_train_arr[:, j]
+            xj = x_train_arr[:, j]
             # Handle constant columns / nan corr
             if np.std(xj) == 0:
                 corr = 0.0
@@ -229,12 +235,14 @@ class AutomaticRandomForestRegressor:
                     corr = 0.0
 
             imp = importances[j]
-            importance_rows.append({
-                "feature": fname,
-                "importance": imp,
-                "correlation": corr,
-                "sign": "+" if corr >= 0 else "-",
-            })
+            importance_rows.append(
+                {
+                    "feature": fname,
+                    "importance": imp,
+                    "correlation": corr,
+                    "sign": "+" if corr >= 0 else "-",
+                }
+            )
 
         self.importance_df_ = (
             pd.DataFrame(importance_rows)
@@ -267,7 +275,7 @@ class AutomaticRandomForestRegressor:
         Features are displayed in order of importance (mixed +/- correlations).
         """
         if self.importance_df_ is None:
-            raise RuntimeError("Model not fitted yet. Call .fit(X, y) first.")
+            raise RuntimeError("Model not fitted yet. Call .fit(x, y) first.")
 
         df = self.importance_df_.copy()
         if top_n is not None:
@@ -284,21 +292,19 @@ class AutomaticRandomForestRegressor:
             hover_data={"importance": ":.4f", "sign": True},
             category_orders={"feature": df["feature"].tolist()},  # Preserve importance order
         )
-        fig.update_traces(textposition='outside')  # Place text above bars
+        fig.update_traces(textposition="outside")  # Place text above bars
         fig.update_layout(
-            xaxis_title="Feature",
-            yaxis_title="Importance",
-            legend_title="Correlation sign"
+            xaxis_title="Feature", yaxis_title="Importance", legend_title="Correlation sign"
         )
         return fig
 
     def plot_cv_scores(self, use_rmse=True):
         """
         Plot cross-validation performance as a function of n_estimators & max_depth.
-        X-axis is n_estimators; color is max_depth.
+        x-axis is n_estimators; color is max_depth.
         """
         if self.cv_results_df_ is None:
-            raise RuntimeError("Model not fitted yet. Call .fit(X, y) first.")
+            raise RuntimeError("Model not fitted yet. Call .fit(x, y) first.")
 
         df = self.cv_results_df_.copy()
 
@@ -367,8 +373,8 @@ class AutomaticRandomForestRegressor:
             raise ValueError("split must be 'train' or 'test'")
 
         if split == "train":
-            if self.y_train_pred_ is None:
-                raise RuntimeError("Model not fitted yet. Call .fit(X, y) first.")
+            if self.y_train_pred_ is None or self.y_train_ is None:
+                raise RuntimeError("Model not fitted yet. Call .fit(x, y) first.")
             y_true = self.y_train_
             y_pred = self.y_train_pred_
         else:
@@ -377,23 +383,25 @@ class AutomaticRandomForestRegressor:
             y_true = self.y_test_
             y_pred = self.y_test_pred_
 
+        if y_true is None or y_pred is None:
+            raise RuntimeError("Cannot compute metrics: predictions or true values are None.")
+
         r2 = r2_score(y_true, y_pred)
         rmse = np.sqrt(mean_squared_error(y_true, y_pred))
         metrics_txt = f"R² = {r2:.3f}, RMSE = {rmse:.3f}"
 
-        df = pd.DataFrame({
-            "y_true": y_true,
-            "y_pred": y_pred,
-        })
+        df = pd.DataFrame(
+            {
+                "y_true": y_true,
+                "y_pred": y_pred,
+            }
+        )
 
         fig = px.scatter(
             df,
             x="y_true",
             y="y_pred",
-            title=(
-                f"Predicted vs true ({split} set) — "
-                f"Random Forest | {metrics_txt}"
-            ),
+            title=(f"Predicted vs true ({split} set) — Random Forest | {metrics_txt}"),
         )
         fig.update_layout(
             xaxis_title="True values",
@@ -409,7 +417,7 @@ class AutomaticRandomForestRegressor:
                     y=[min_val, max_val],
                     mode="lines",
                     name="y = x",
-                    line=dict(dash="dash"),
+                    line={"dash": "dash"},
                 )
             )
 

@@ -17,7 +17,7 @@ class EconmlEnvHelper:
     )
 
     @classmethod
-    def create_proxy(cls, message_dispatcher: MessageDispatcher = None) -> MambaShellProxy:
+    def create_proxy(cls, message_dispatcher: MessageDispatcher | None = None) -> MambaShellProxy:
         """
         Create a MambaShellProxy for the econml environment.
 
@@ -27,8 +27,13 @@ class EconmlEnvHelper:
         Returns:
             MambaShellProxy instance configured for econml environment
         """
+        if message_dispatcher is not None:
+            return MambaShellProxy(
+                env_file_path=cls.env_file_path,
+                env_name=cls.unique_env_name,
+                message_dispatcher=message_dispatcher
+            )
         return MambaShellProxy(
             env_file_path=cls.env_file_path,
-            env_name=cls.unique_env_name,
-            message_dispatcher=message_dispatcher
+            env_name=cls.unique_env_name
         )

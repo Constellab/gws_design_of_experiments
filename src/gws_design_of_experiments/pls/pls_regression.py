@@ -1,17 +1,18 @@
 import numpy as np
 import pandas as pd
-from sklearn.cross_decomposition import PLSRegression
-from sklearn.model_selection import train_test_split, KFold, cross_val_score
-from sklearn.metrics import r2_score, mean_squared_error
 import plotly.express as px
 import plotly.graph_objects as go
+from sklearn.cross_decomposition import PLSRegression
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.model_selection import KFold, cross_val_score, train_test_split
+
 
 class AutomaticPLSRegressor:
     def __init__(
         self,
-        test_size=None,          # e.g. 0.2; if None -> no test set
+        test_size=None,  # e.g. 0.2; if None -> no test set
         n_splits=5,
-        max_components=None,     # if None -> min(n_samples-1, n_features)
+        max_components=None,  # if None -> min(n_samples-1, n_features)
         random_state=42,
         scale=True,
         target_name=None,
@@ -31,9 +32,9 @@ class AutomaticPLSRegressor:
         self.metrics_df_ = None
         self.vip_df_ = None
 
-        self.X_train_ = None
+        self.x_train_ = None
         self.y_train_ = None
-        self.X_test_ = None
+        self.x_test_ = None
         self.y_test_ = None
         self.y_train_pred_ = None
         self.y_test_pred_ = None
@@ -48,29 +49,29 @@ class AutomaticPLSRegressor:
         VIP_j = sqrt( p * sum_a(SSY_a * w_{j,a}^2 / sum_j w_{j,a}^2) / sum_a SSY_a )
         where SSY_a is variance in Y explained by component a.
         """
-        T = pls_model.x_scores_      # (n_samples, n_components)
-        W = pls_model.x_weights_     # (n_features, n_components)
-        Q = pls_model.y_loadings_    # (n_targets, n_components)
+        t = pls_model.x_scores_  # (n_samples, n_components)
+        w = pls_model.x_weights_  # (n_features, n_components)
+        q = pls_model.y_loadings_  # (n_targets, n_components)
 
-        n_features = W.shape[0]
+        n_features = w.shape[0]
 
-        # SSY_a for each component a:
-        # SSY_a = (sum_i t_ia^2) * (sum_k q_ka^2)
-        SSt = np.sum(T ** 2, axis=0)             # (n_components,)
-        SSq = np.sum(Q ** 2, axis=0)             # (n_components,)
-        SSY = SSt * SSq                          # (n_components,)
-        total_SSY = np.sum(SSY)
+        # ssy_a for each component a:
+        # ssy_a = (sum_i t_ia^2) * (sum_k q_ka^2)
+        sst = np.sum(t**2, axis=0)  # (n_components,)
+        ssq = np.sum(q**2, axis=0)  # (n_components,)
+        ssy = sst * ssq  # (n_components,)
+        total_ssy = np.sum(ssy)
 
         vip = np.zeros(n_features)
         for j in range(n_features):
-            w_j = W[j, :]                        # (n_components,)
-            w_norm_sq = np.sum(W ** 2, axis=0)   # (n_components,)
-            weight_term = (w_j ** 2) / w_norm_sq
-            vip[j] = np.sqrt(n_features * np.sum(SSY * weight_term) / total_SSY)
+            w_j = w[j, :]  # (n_components,)
+            w_norm_sq = np.sum(w**2, axis=0)  # (n_components,)
+            weight_term = (w_j**2) / w_norm_sq
+            vip[j] = np.sqrt(n_features * np.sum(ssy * weight_term) / total_ssy)
 
         return vip
 
-    def fit(self, X, y):
+    def fit(self, x, y):
         """
         Run automatic PLS regression with:
         - optional train/test split
@@ -79,10 +80,10 @@ class AutomaticPLSRegressor:
         - VIP computation
         """
         # Keep feature and target names if DataFrame
-        if hasattr(X, "columns"):
-            self.feature_names_ = list(X.columns)
+        if hasattr(x, "columns"):
+            self.feature_names_ = list(x.columns)
         else:
-            self.feature_names_ = [f"x{i}" for i in range(np.asarray(X).shape[1])]
+            self.feature_names_ = [f"x{i}" for i in range(np.asarray(x).shape[1])]
 
         if hasattr(y, "columns"):
             self.target_names_ = list(y.columns)
@@ -95,14 +96,14 @@ class AutomaticPLSRegressor:
             else:
                 self.target_names_ = [f"y{i}" for i in range(y_arr.shape[1])]
 
-        X = np.asarray(X, dtype=float)
+        x = np.asarray(x, dtype=float)
         y = np.asarray(y, dtype=float)
 
         # Ensure y is 2D: (n_samples, n_targets)
         if y.ndim == 1:
             y = y.reshape(-1, 1)
 
-        n_samples, n_features = X.shape
+        n_samples, n_features = x.shape
 
         _max_components = min(n_samples - 1, n_features)
         if self.max_components is None:
@@ -112,17 +113,15 @@ class AutomaticPLSRegressor:
 
         # Optional train/test split
         if self.test_size is not None and self.test_size > 0:
-            X_train, X_test, y_train, y_test = train_test_split(
-                X, y,
-                test_size=self.test_size,
-                random_state=self.random_state
+            x_train, x_test, y_train, y_test = train_test_split(
+                x, y, test_size=self.test_size, random_state=self.random_state
             )
         else:
-            X_train, y_train = X, y
-            X_test = y_test = None
+            x_train, y_train = x, y
+            x_test = y_test = None
 
-        self.X_train_, self.y_train_ = X_train, y_train
-        self.X_test_, self.y_test_ = X_test, y_test
+        self.x_train_, self.y_train_ = x_train, y_train
+        self.x_test_, self.y_test_ = x_test, y_test
 
         # Hyperparameter tuning: number of components via CV (neg MSE)
         kf = KFold(n_splits=self.n_splits, shuffle=True, random_state=self.random_state)
@@ -134,7 +133,7 @@ class AutomaticPLSRegressor:
             pls = PLSRegression(n_components=n_comp, scale=self.scale)
             scores = cross_val_score(
                 pls,
-                X_train,
+                x_train,
                 y_train,
                 cv=kf,
                 scoring="neg_mean_squared_error",  # averaged over outputs
@@ -146,11 +145,13 @@ class AutomaticPLSRegressor:
         cv_stds = np.array(cv_stds)
 
         # Store CV results as DataFrame
-        cv_df = pd.DataFrame({
-            "n_components": list(component_range),
-            "cv_neg_mse_mean": cv_means,
-            "cv_neg_mse_std": cv_stds,
-        })
+        cv_df = pd.DataFrame(
+            {
+                "n_components": list(component_range),
+                "cv_neg_mse_mean": cv_means,
+                "cv_neg_mse_std": cv_stds,
+            }
+        )
         cv_df["cv_rmse_mean"] = np.sqrt(-cv_df["cv_neg_mse_mean"])
         self.cv_results_df_ = cv_df
 
@@ -159,59 +160,60 @@ class AutomaticPLSRegressor:
         best_n_components = component_range[best_idx]
 
         # Fit final model
-        best_pls = PLSRegression(n_components=best_n_components, scale=self.scale)
-        best_pls.fit(X_train, y_train)
-        self.model_ = best_pls
+        self.model_ = PLSRegression(n_components=best_n_components, scale=self.scale)
+        self.model_.fit(self.x_train_, self.y_train_)
 
         # Predictions & metrics (per target)
-        y_train_pred = best_pls.predict(X_train)  # (n_samples, n_targets)
+        y_train_pred = self.model_.predict(self.x_train_)  # (n_samples, n_targets)
         self.y_train_pred_ = y_train_pred
 
-        train_r2 = r2_score(y_train, y_train_pred, multioutput="raw_values")
+        train_r2 = r2_score(self.y_train_, self.y_train_pred_, multioutput="raw_values")
         train_rmse = np.sqrt(
-            mean_squared_error(y_train, y_train_pred, multioutput="raw_values")
+            mean_squared_error(self.y_train_, self.y_train_pred_, multioutput="raw_values")
         )
 
         rows = []
         for i, tname in enumerate(self.target_names_):
-            rows.append({
-                "split": "train",
-                "target": tname,
-                "best_n_components": best_n_components,
-                "R2": train_r2[i],
-                "RMSE": train_rmse[i],
-            })
+            rows.append(
+                {
+                    "split": "train",
+                    "target": tname,
+                    "best_n_components": best_n_components,
+                    "R2": train_r2[i],
+                    "RMSE": train_rmse[i],
+                }
+            )
 
         y_test_pred = None
-        if X_test is not None:
-            y_test_pred = best_pls.predict(X_test)
+        if x_test is not None and y_test is not None:
+            y_test_pred = self.model_.predict(x_test)
             self.y_test_pred_ = y_test_pred
 
             test_r2 = r2_score(y_test, y_test_pred, multioutput="raw_values")
-            test_rmse = np.sqrt(
-                mean_squared_error(y_test, y_test_pred, multioutput="raw_values")
-            )
+            test_rmse = np.sqrt(mean_squared_error(y_test, y_test_pred, multioutput="raw_values"))
 
             for i, tname in enumerate(self.target_names_):
-                rows.append({
-                    "split": "test",
-                    "target": tname,
-                    "best_n_components": best_n_components,
-                    "R2": test_r2[i],
-                    "RMSE": test_rmse[i],
-                })
+                rows.append(
+                    {
+                        "split": "test",
+                        "target": tname,
+                        "best_n_components": best_n_components,
+                        "R2": test_r2[i],
+                        "RMSE": test_rmse[i],
+                    }
+                )
         else:
             self.y_test_pred_ = None
 
         self.metrics_df_ = pd.DataFrame(rows)
 
         # VIP scores
-        vip_values = self._compute_vip(best_pls)
+        vip_values = self._compute_vip(self.model_)
 
         # Extract regression coefficients
         # For multi-output, coef_ has shape (n_targets, n_features)
         # For single output, coef_ has shape (1, n_features)
-        coefs = best_pls.coef_  # (1, n_features) or (n_targets, n_features)
+        coefs = self.model_.coef_  # (1, n_features) or (n_targets, n_features)
 
         # Always squeeze to handle both cases, then average if needed
         if coefs.shape[0] == 1:
@@ -222,12 +224,18 @@ class AutomaticPLSRegressor:
             # TODO see to display one graph per target instead
             avg_coefs = np.mean(coefs, axis=0)
 
-        self.vip_df_ = pd.DataFrame({
-            "feature": self.feature_names_,
-            "VIP": vip_values,
-            "coefficient": avg_coefs,
-            "sign": ["+" if c >= 0 else "-" for c in avg_coefs]
-        }).sort_values("VIP", ascending=False).reset_index(drop=True)
+        self.vip_df_ = (
+            pd.DataFrame(
+                {
+                    "feature": self.feature_names_,
+                    "VIP": vip_values,
+                    "coefficient": avg_coefs,
+                    "sign": ["+" if c >= 0 else "-" for c in avg_coefs],
+                }
+            )
+            .sort_values("VIP", ascending=False)
+            .reset_index(drop=True)
+        )
 
         return self
 
@@ -269,11 +277,11 @@ class AutomaticPLSRegressor:
             hover_data={"VIP": ":.4f", "sign": True},
             category_orders={"feature": df["feature"].tolist()},  # Preserve VIP order
         )
-        fig.update_traces(textposition='outside')  # Place text above bars
+        fig.update_traces(textposition="outside")  # Place text above bars
         fig.update_layout(
             xaxis_title="Feature",
             yaxis_title="VIP score",
-            legend_title="Regression coefficient sign"
+            legend_title="Regression coefficient sign",
         )
         return fig
 
@@ -305,14 +313,11 @@ class AutomaticPLSRegressor:
             markers=True,
             title=title,
         )
-        fig.update_layout(
-            xaxis_title="Number of components",
-            yaxis_title=y_label
-        )
+        fig.update_layout(xaxis_title="Number of components", yaxis_title=y_label)
 
         # Mark best n_components
         if self.model_ is not None:
-            best_n = self.model_.n_components
+            best_n = self.model_.x_scores_.shape[1]
             best_val = df.loc[df["n_components"] == best_n, y_col].iloc[0]
             fig.add_trace(
                 go.Scatter(
@@ -334,6 +339,9 @@ class AutomaticPLSRegressor:
         split : "train" or "test"
         add_identity_line : if True, add y = x reference line.
         """
+        facet_col_wrap = 2
+        facet_threshold = 2
+
         if split not in ("train", "test"):
             raise ValueError("split must be 'train' or 'test'")
 
@@ -348,29 +356,38 @@ class AutomaticPLSRegressor:
             y_true = self.y_test_
             y_pred = self.y_test_pred_
 
+        if y_true is None or self.target_names_ is None:
+            raise RuntimeError(f"No {split} data available or model not fitted.")
+
         n_targets = y_true.shape[1]
 
         # Build long-format DataFrame for facetting
         rows = []
         for t_idx in range(n_targets):
             tname = self.target_names_[t_idx]
-            for yt, yp in zip(y_true[:, t_idx], y_pred[:, t_idx]):
-                rows.append({
-                    "y_true": yt,
-                    "y_pred": yp,
-                    "target": tname,
-                })
+            for yt, yp in zip(y_true[:, t_idx], y_pred[:, t_idx], strict=False):
+                rows.append(
+                    {
+                        "y_true": yt,
+                        "y_pred": yp,
+                        "target": tname,
+                    }
+                )
 
         df = pd.DataFrame(rows)
 
-        fig = px.scatter(
-            df,
-            x="y_true",
-            y="y_pred",
-            facet_col="target" if n_targets > 1 else None,
-            facet_col_wrap=2 if n_targets > 2 else None,
-            title=f"Predicted vs. true values ({split} set)",
-        )
+        scatter_kwargs = {
+            "data_frame": df,
+            "x": "y_true",
+            "y": "y_pred",
+            "facet_col": "target" if n_targets > 1 else None,
+            "title": f"Predicted vs. true values ({split} set)",
+        }
+
+        if n_targets > facet_threshold:
+            scatter_kwargs["facet_col_wrap"] = facet_col_wrap
+
+        fig = px.scatter(**scatter_kwargs)
         fig.update_layout(
             xaxis_title="True values",
             yaxis_title="Predicted values",
@@ -389,7 +406,7 @@ class AutomaticPLSRegressor:
                         mode="lines",
                         name="y = x" if t_idx == 0 else None,
                         showlegend=(t_idx == 0),
-                        line=dict(dash="dash", color="gray"),
+                        line={"dash": "dash", "color": "gray"},
                     ),
                     row=1 if n_targets <= 2 else (t_idx // 2 + 1),
                     col=(t_idx % 2 + 1) if n_targets > 1 else 1,

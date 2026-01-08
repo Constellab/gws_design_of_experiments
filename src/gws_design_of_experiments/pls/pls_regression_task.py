@@ -1,13 +1,32 @@
-from gws_core import (ConfigParams, BoolParam, FloatParam, PlotlyResource, ListParam, TypingStyle, ConfigSpecs, InputSpec, InputSpecs, OutputSpec, OutputSpecs, Resource, Task, TaskInputs, TaskOutputs, task_decorator)
 import numpy as np
 import pandas as pd
-from gws_core import Table
+from gws_core import (
+    BoolParam,
+    ConfigParams,
+    ConfigSpecs,
+    FloatParam,
+    InputSpec,
+    InputSpecs,
+    ListParam,
+    OutputSpec,
+    OutputSpecs,
+    PlotlyResource,
+    Table,
+    Task,
+    TaskInputs,
+    TaskOutputs,
+    TypingStyle,
+    task_decorator,
+)
 from gws_design_of_experiments.pls.pls_regression import AutomaticPLSRegressor
 
 
-@task_decorator("PLSRegression", human_name="PLS Regression", short_description="PLS Regression",
-                style=TypingStyle.material_icon(material_icon_name="insights",
-                background_color="#c5fe85"))
+@task_decorator(
+    "PLSRegression",
+    human_name="PLS Regression",
+    short_description="PLS Regression",
+    style=TypingStyle.material_icon(material_icon_name="insights", background_color="#c5fe85"),
+)
 class PLSRegressorTask(Task):
     """
     Partial Least Squares (PLS) Regression Task with automatic component selection.
@@ -34,30 +53,39 @@ class PLSRegressorTask(Task):
         - test_size: Proportion of data to use for testing (0.0 to 1.0)
     """
 
-    input_specs: InputSpecs = InputSpecs({'data': InputSpec(Table, human_name='Input Data')})
-    output_specs: OutputSpecs = OutputSpecs({'summary_table': OutputSpec(Table, human_name="Summary Table"),
-                                          'vip_table': OutputSpec(Table, human_name="Variable Importance Table"),
-                                          'plot_components': OutputSpec(PlotlyResource, human_name="Components Plot"),
-                                          'vip_plot': OutputSpec(PlotlyResource, human_name="Variable Importance Plot"),
-                                          'plot_train_set': OutputSpec(PlotlyResource, human_name="Train Predictions Plot"),
-                                          'plot_test_set': OutputSpec(PlotlyResource, human_name="Test Predictions Plot")})
-    config_specs : ConfigSpecs = ConfigSpecs({
-                'target': ListParam(
-                human_name="Target Column"),
-                'columns_to_exclude': ListParam(
+    input_specs: InputSpecs = InputSpecs({"data": InputSpec(Table, human_name="Input Data")})
+    output_specs: OutputSpecs = OutputSpecs(
+        {
+            "summary_table": OutputSpec(Table, human_name="Summary Table"),
+            "vip_table": OutputSpec(Table, human_name="Variable Importance Table"),
+            "plot_components": OutputSpec(PlotlyResource, human_name="Components Plot"),
+            "vip_plot": OutputSpec(PlotlyResource, human_name="Variable Importance Plot"),
+            "plot_train_set": OutputSpec(PlotlyResource, human_name="Train Predictions Plot"),
+            "plot_test_set": OutputSpec(PlotlyResource, human_name="Test Predictions Plot"),
+        }
+    )
+    config_specs: ConfigSpecs = ConfigSpecs(
+        {
+            "target": ListParam(human_name="Target Column"),
+            "columns_to_exclude": ListParam(
                 human_name="Columns to Exclude",
                 short_description="List of column names to exclude from RandomForest analysis",
-                optional=True),
-                'scale_data': BoolParam(
+                optional=True,
+            ),
+            "scale_data": BoolParam(
                 default_value=True,
                 human_name="Scale Data",
-                short_description="Whether to scale the data before fitting the PLS model."),
-                'test_size': FloatParam(
+                short_description="Whether to scale the data before fitting the PLS model.",
+            ),
+            "test_size": FloatParam(
                 default_value=0.2,
                 min_value=0.0,
                 max_value=1.0,
                 human_name="Test size",
-                short_description="Proportion of the dataset to include in the test split (between 0.0 and 1.0).")})
+                short_description="Proportion of the dataset to include in the test split (between 0.0 and 1.0).",
+            ),
+        }
+    )
 
     def run(self, params: ConfigParams, inputs: TaskInputs) -> TaskOutputs:
         """
@@ -76,68 +104,72 @@ class PLSRegressorTask(Task):
         TaskOutputs
             Dictionary containing summary tables and plots
         """
-        df = inputs['data'].get_data()
-        X = df
-        cols_to_drop = list(set((params['columns_to_exclude'] if params['columns_to_exclude'] else []) + params['target']))
+        df = inputs["data"].get_data()
+        x = df
+        cols_to_drop = list(
+            set(
+                (params["columns_to_exclude"] if params["columns_to_exclude"] else [])
+                + params["target"]
+            )
+        )
 
-        X = self.remove_constant_columns(X.drop(cols_to_drop, axis=1))
-        y = df[params['target']]
-        target_name = str(params['target'])
-        test_size = params['test_size']
-        scale_data = params['scale_data']
+        x = self.remove_constant_columns(x.drop(cols_to_drop, axis=1))
+        y = df[params["target"]]
+        target_name = str(params["target"])
+        test_size = params["test_size"]
+        scale_data = params["scale_data"]
 
-        metric_df, vip_df, fig_vip, fig_cv, fig_pred_train, fig_pred_test = self.main(X,y, target_name, test_size, scale_data)
+        metric_df, vip_df, fig_vip, fig_cv, fig_pred_train, fig_pred_test = self.main(
+            x, y, target_name, test_size, scale_data
+        )
 
-        return {"summary_table": metric_df,
-                "vip_table": vip_df,
-                "plot_components": PlotlyResource(fig_cv),
-                "vip_plot": PlotlyResource(fig_vip),
-                "plot_train_set": PlotlyResource(fig_pred_train),
-                "plot_test_set": PlotlyResource(fig_pred_test),
-               }
+        if metric_df is None or vip_df is None:
+            raise ValueError("PLS regression failed to produce valid results")
 
+        return {
+            "summary_table": Table(metric_df),
+            "vip_table": Table(vip_df),
+            "plot_components": PlotlyResource(fig_cv),
+            "vip_plot": PlotlyResource(fig_vip),
+            "plot_train_set": PlotlyResource(fig_pred_train),
+            "plot_test_set": PlotlyResource(fig_pred_test),
+        }
 
-    def remove_constant_columns(self, X):
+    def remove_constant_columns(self, x):
         """
-        Remove constant (zero-variance) columns from X.
+        Remove constant (zero-variance) columns from x.
 
         Parameters
         ----------
-        X : pandas DataFrame or numpy array
+        x : pandas DataFrame or numpy array
             Input feature matrix
 
         Returns
         -------
-        X_clean : DataFrame or array
+        x_clean : DataFrame or array
             Feature matrix with constant columns removed
         """
         # If pandas → extract names, else create generic names
-        if isinstance(X, pd.DataFrame):
-            X_arr = X.values
-        else:
-            X_arr = np.asarray(X)
+        x_arr = x.values if isinstance(x, pd.DataFrame) else np.asarray(x)
 
         # Compute variance for each column
-        variances = np.var(X_arr, axis=0)
+        variances = np.var(x_arr, axis=0)
 
         # Find constant columns
         kept_idx = np.where(variances != 0)[0]
 
         # Produce cleaned output
-        if isinstance(X, pd.DataFrame):
-            X_clean = X.iloc[:, kept_idx]
-        else:
-            X_clean = X_arr[:, kept_idx]
+        x_clean = x.iloc[:, kept_idx] if isinstance(x, pd.DataFrame) else x_arr[:, kept_idx]
 
-        return X_clean
+        return x_clean
 
-    def main(self, X, y, target_name, test_size, scale_data):
+    def main(self, x, y, target_name, test_size, scale_data):
         """
         Main execution logic for PLS regression.
 
         Parameters
         ----------
-        X : DataFrame or array
+        x : DataFrame or array
             Feature matrix
         y : DataFrame or Series
             Target variable(s)
@@ -153,8 +185,14 @@ class PLSRegressorTask(Task):
         tuple
             (metric_df, vip_df, fig_vip, fig_cv, fig_pred_train, fig_pred_test)
         """
-        model = AutomaticPLSRegressor(test_size=test_size, n_splits=5, max_components=10, target_name=target_name, scale=scale_data)
-        model.fit(X, y)
+        model = AutomaticPLSRegressor(
+            test_size=test_size,
+            n_splits=5,
+            max_components=10,
+            target_name=target_name,
+            scale=scale_data,
+        )
+        model.fit(x, y)
 
         metric_df = model.metrics_df
         vip_df = model.vip_df

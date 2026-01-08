@@ -1,21 +1,38 @@
-from umap import UMAP
-from scipy import stats
 import numpy as np
 import pandas as pd
 import plotly.express as px
-from sklearn.preprocessing import StandardScaler
+from gws_core import (
+    BoolParam,
+    ConfigParams,
+    ConfigSpecs,
+    FloatParam,
+    InputSpec,
+    InputSpecs,
+    IntParam,
+    ListParam,
+    OutputSpec,
+    OutputSpecs,
+    PlotlyResource,
+    StrParam,
+    Table,
+    Task,
+    TaskInputs,
+    TaskOutputs,
+    TypingStyle,
+    task_decorator,
+)
+from scipy import stats
 from sklearn.cluster import KMeans
-
-from gws_core import (ConfigParams, ConfigSpecs, InputSpec, InputSpecs,
-                      OutputSpec, OutputSpecs, ListParam,
-                      Table, Task, TaskInputs, TaskOutputs, TypingStyle, PlotlyResource,
-                      task_decorator, IntParam, FloatParam, BoolParam, StrParam)
+from sklearn.preprocessing import StandardScaler
+from umap import UMAP
 
 
-@task_decorator("UMAPTask", human_name="UMAP Dimensionality Reduction",
-                short_description="UMAP for dimensionality reduction and visualization",
-                style=TypingStyle.material_icon(material_icon_name="scatter_plot",
-                                                background_color="#85c5fe"))
+@task_decorator(
+    "UMAPTask",
+    human_name="UMAP Dimensionality Reduction",
+    short_description="UMAP for dimensionality reduction and visualization",
+    style=TypingStyle.material_icon(material_icon_name="scatter_plot", background_color="#85c5fe"),
+)
 class UMAPTask(Task):
     """
     Performs UMAP (Uniform Manifold Approximation and Projection) dimensionality reduction.
@@ -45,74 +62,111 @@ class UMAPTask(Task):
         - color_by: Column name to color points by (optional)
         - columns_to_exclude: Comma-separated list of column names to exclude from UMAP analysis
     """
-    METRICS_OPTION = ["euclidean", "manhattan", "chebyshev", "minkowski", "canberra",
-                        "braycurtis", "mahalanobis", "wminkowski", "seuclidean",
-                        "cosine", "correlation", "haversine",  "hamming",
-                        "jaccard", "dice", "russelrao", "kulsinski",
-                        "ll_dirichlet", "hellinger", "rogerstanimoto", "sokalmichener",
-                        "sokalsneath", "yule"]
-    input_specs = InputSpecs({'data': InputSpec(Table, human_name="Data",
-                             short_description="Input data for UMAP")})
 
-    config_specs = ConfigSpecs({
-        'n_neighbors': IntParam(
-            default_value=15,
-            min_value=2,
-            max_value=200,
-            human_name="Number of Neighbors",
-            short_description="Controls how UMAP balances local vs global structure"),
-        'min_dist': FloatParam(
-            default_value=0.1,
-            min_value=0.0,
-            max_value=0.99,
-            human_name="Minimum Distance",
-            short_description="Minimum distance between points in the embedding"),
-        'metric': StrParam(
-            default_value='euclidean',
-            allowed_values=METRICS_OPTION,
-            human_name="Distance Metric",
-            short_description="Distance metric to use (euclidean, manhattan, cosine, etc.)"),
-        'scale_data': BoolParam(
-            default_value=True,
-            human_name="Scale Data",
-            short_description="Whether to scale the data before applying UMAP"),
-        'n_clusters': IntParam(
-            min_value=2,
-            human_name="Number of Clusters",
-            short_description="Number of clusters for K-Means clustering (optional)",
-            optional=True),
-        'color_by': StrParam(
-            human_name="Color By Column",
-            short_description="Column name to color points by (optional)",
-            optional=True),
-        'columns_to_exclude': ListParam(
-            human_name="Columns to Exclude",
-            short_description="List of column names to exclude from UMAP analysis",
-            optional=True),
-        'hover_data_columns': ListParam(
-            human_name="Hover Data Columns",
-            short_description="List of column names to display as metadata on hover",
-            optional=True)
-    })
+    METRICS_OPTION = [
+        "euclidean",
+        "manhattan",
+        "chebyshev",
+        "minkowski",
+        "canberra",
+        "braycurtis",
+        "mahalanobis",
+        "wminkowski",
+        "seuclidean",
+        "cosine",
+        "correlation",
+        "haversine",
+        "hamming",
+        "jaccard",
+        "dice",
+        "russelrao",
+        "kulsinski",
+        "ll_dirichlet",
+        "hellinger",
+        "rogerstanimoto",
+        "sokalmichener",
+        "sokalsneath",
+        "yule",
+    ]
+    input_specs = InputSpecs(
+        {"data": InputSpec(Table, human_name="Data", short_description="Input data for UMAP")}
+    )
 
-    output_specs = OutputSpecs({
-        'umap_2d_plot': OutputSpec(
-            PlotlyResource,
-            human_name="UMAP 2D Plot",
-            short_description="Interactive UMAP 2D embedding visualization"),
-        'umap_3d_plot': OutputSpec(
-            PlotlyResource,
-            human_name="UMAP 3D Plot",
-            short_description="Interactive UMAP 3D embedding visualization"),
-        'umap_2d_table': OutputSpec(
-            Table,
-            human_name="UMAP 2D Table",
-            short_description="Table with UMAP 2D coordinates and cluster assignments"),
-        'umap_3d_table': OutputSpec(
-            Table,
-            human_name="UMAP 3D Table",
-            short_description="Table with UMAP 3D coordinates and cluster assignments")
-    })
+    config_specs = ConfigSpecs(
+        {
+            "n_neighbors": IntParam(
+                default_value=15,
+                min_value=2,
+                max_value=200,
+                human_name="Number of Neighbors",
+                short_description="Controls how UMAP balances local vs global structure",
+            ),
+            "min_dist": FloatParam(
+                default_value=0.1,
+                min_value=0.0,
+                max_value=0.99,
+                human_name="Minimum Distance",
+                short_description="Minimum distance between points in the embedding",
+            ),
+            "metric": StrParam(
+                default_value="euclidean",
+                allowed_values=METRICS_OPTION,
+                human_name="Distance Metric",
+                short_description="Distance metric to use (euclidean, manhattan, cosine, etc.)",
+            ),
+            "scale_data": BoolParam(
+                default_value=True,
+                human_name="Scale Data",
+                short_description="Whether to scale the data before applying UMAP",
+            ),
+            "n_clusters": IntParam(
+                min_value=2,
+                human_name="Number of Clusters",
+                short_description="Number of clusters for K-Means clustering (optional)",
+                optional=True,
+            ),
+            "color_by": StrParam(
+                human_name="Color By Column",
+                short_description="Column name to color points by (optional)",
+                optional=True,
+            ),
+            "columns_to_exclude": ListParam(
+                human_name="Columns to Exclude",
+                short_description="List of column names to exclude from UMAP analysis",
+                optional=True,
+            ),
+            "hover_data_columns": ListParam(
+                human_name="Hover Data Columns",
+                short_description="List of column names to display as metadata on hover",
+                optional=True,
+            ),
+        }
+    )
+
+    output_specs = OutputSpecs(
+        {
+            "umap_2d_plot": OutputSpec(
+                PlotlyResource,
+                human_name="UMAP 2D Plot",
+                short_description="Interactive UMAP 2D embedding visualization",
+            ),
+            "umap_3d_plot": OutputSpec(
+                PlotlyResource,
+                human_name="UMAP 3D Plot",
+                short_description="Interactive UMAP 3D embedding visualization",
+            ),
+            "umap_2d_table": OutputSpec(
+                Table,
+                human_name="UMAP 2D Table",
+                short_description="Table with UMAP 2D coordinates and cluster assignments",
+            ),
+            "umap_3d_table": OutputSpec(
+                Table,
+                human_name="UMAP 3D Table",
+                short_description="Table with UMAP 3D coordinates and cluster assignments",
+            ),
+        }
+    )
 
     def run(self, params: ConfigParams, inputs: TaskInputs) -> TaskOutputs:
         # Load data
@@ -120,8 +174,8 @@ class UMAPTask(Task):
 
         # Extract hover data columns if specified
         hover_data = {}
-        if params['hover_data_columns']:
-            hover_cols = [col.strip() for col in params['hover_data_columns']]
+        if params["hover_data_columns"]:
+            hover_cols = [col.strip() for col in params["hover_data_columns"]]
             # Validate that columns exist
             invalid_cols = [col for col in hover_cols if col not in df.columns]
             if invalid_cols:
@@ -135,8 +189,8 @@ class UMAPTask(Task):
         color_column_is_numeric = False
         color_log_applied = False
         should_log_transform = False
-        if params['color_by'] and params['color_by'] in df.columns:
-            color_column = df[params['color_by']].copy()
+        if params["color_by"] and params["color_by"] in df.columns:
+            color_column = df[params["color_by"]].copy()
             # Check if color column is numeric
             color_column_is_numeric = pd.api.types.is_numeric_dtype(color_column)
             if color_column_is_numeric:
@@ -149,14 +203,16 @@ class UMAPTask(Task):
                 # Apply log transformation if needed
                 if should_log_transform:
                     # Add small constant to avoid log(0)
-                    min_positive = color_column[color_column > 0].min() if (color_column > 0).any() else 1
+                    min_positive = (
+                        color_column[color_column > 0].min() if (color_column > 0).any() else 1
+                    )
                     color_column = np.log10(color_column + min_positive * 0.01)
                     color_log_applied = True
 
         # Exclude specified columns
         columns_to_drop = []
-        if params['columns_to_exclude']:
-            columns_to_drop = [col for col in params['columns_to_exclude']]
+        if params["columns_to_exclude"]:
+            columns_to_drop = list(params["columns_to_exclude"])
             # Validate that columns exist
             invalid_cols = [col for col in columns_to_drop if col not in df.columns]
             if invalid_cols:
@@ -166,74 +222,78 @@ class UMAPTask(Task):
         columns_to_drop = list(set(columns_to_drop))
 
         # Drop excluded columns
-        if columns_to_drop:
-            X = df.drop(columns=columns_to_drop).copy()
-        else:
-            X = df.copy()
+        x = df.drop(columns=columns_to_drop).copy() if columns_to_drop else df.copy()
 
         # Check for categorical variables
-        if X.select_dtypes(include=['object', 'category', 'string']).shape[1] > 0:
-            raise ValueError("Categorical variables are not supported. Please encode or remove them or use them to color the points.")
+        if x.select_dtypes(include=["object", "category", "string"]).shape[1] > 0:
+            raise ValueError(
+                "Categorical variables are not supported. Please encode or remove them or use them to color the points."
+            )
 
         # Store original index
-        original_index = X.index
+        original_index = x.index
 
         # Scaling if requested
-        if params['scale_data']:
+        if params["scale_data"]:
             scaler = StandardScaler()
-            X_scaled = scaler.fit_transform(X)
+            x_scaled = scaler.fit_transform(x)
         else:
-            X_scaled = X.values
+            x_scaled = x.values
 
         # Apply UMAP for 2D
         reducer_2d = UMAP(
             n_components=2,
-            n_neighbors=params['n_neighbors'],
-            min_dist=params['min_dist'],
+            n_neighbors=params["n_neighbors"],
+            min_dist=params["min_dist"],
             random_state=42,
-            metric=params['metric']
+            metric=params["metric"],
         )
-        embedding_2d = reducer_2d.fit_transform(X_scaled)
+        embedding_2d = reducer_2d.fit_transform(x_scaled)
 
         # Apply UMAP for 3D
         reducer_3d = UMAP(
             n_components=3,
-            n_neighbors=params['n_neighbors'],
-            min_dist=params['min_dist'],
+            n_neighbors=params["n_neighbors"],
+            min_dist=params["min_dist"],
             random_state=42,
-            metric=params['metric']
+            metric=params["metric"],
         )
-        embedding_3d = reducer_3d.fit_transform(X_scaled)
+        embedding_3d = reducer_3d.fit_transform(x_scaled)
+
+        embedding_2d = np.asarray(
+            embedding_2d[0] if isinstance(embedding_2d, tuple) else embedding_2d
+        )
+        embedding_3d = np.asarray(
+            embedding_3d[0] if isinstance(embedding_3d, tuple) else embedding_3d
+        )
 
         # Create 2D result dataframe
-        result_2d_df = pd.DataFrame({
-            'UMAP1': embedding_2d[:, 0],
-            'UMAP2': embedding_2d[:, 1]
-        }, index=original_index)
+        result_2d_df = pd.DataFrame(
+            {"UMAP1": embedding_2d[:, 0], "UMAP2": embedding_2d[:, 1]}, index=original_index
+        )
 
         # Create 3D result dataframe
-        result_3d_df = pd.DataFrame({
-            'UMAP1': embedding_3d[:, 0],
-            'UMAP2': embedding_3d[:, 1],
-            'UMAP3': embedding_3d[:, 2]
-        }, index=original_index)
+        result_3d_df = pd.DataFrame(
+            {"UMAP1": embedding_3d[:, 0], "UMAP2": embedding_3d[:, 1], "UMAP3": embedding_3d[:, 2]},
+            index=original_index,
+        )
 
         # Perform clustering if requested (on 2D embedding)
         cluster_labels = None
-        if params['n_clusters'] is not None:
-            kmeans = KMeans(n_clusters=params['n_clusters'], random_state=42)
+        if params["n_clusters"] is not None:
+            kmeans = KMeans(n_clusters=params["n_clusters"], random_state=42)
             cluster_labels = kmeans.fit_predict(embedding_2d)
-            result_2d_df['Cluster'] = cluster_labels.astype(str)
-            result_3d_df['Cluster'] = cluster_labels.astype(str)
+            result_2d_df["Cluster"] = cluster_labels.astype(str)
+            result_3d_df["Cluster"] = cluster_labels.astype(str)
 
         # Add color column if provided
         if color_column is not None:
             if color_column_is_numeric:
-                result_2d_df['ColorBy'] = color_column.values
-                result_3d_df['ColorBy'] = color_column.values
+                result_2d_df["ColorBy"] = color_column.values
+                result_3d_df["ColorBy"] = color_column.values
             else:
-                result_2d_df['ColorBy'] = color_column.values.astype(str)
-                result_3d_df['ColorBy'] = color_column.values.astype(str)
+                result_2d_df["ColorBy"] = color_column.values.astype(str)
+                result_3d_df["ColorBy"] = color_column.values.astype(str)
 
         # Add hover data columns
         for col_name, col_data in hover_data.items():
@@ -245,16 +305,16 @@ class UMAPTask(Task):
         color_labels = {}
         color_continuous_scale = None
 
-        if params['n_clusters'] is not None:
-            color_param = 'Cluster'
+        if params["n_clusters"] is not None:
+            color_param = "Cluster"
         elif color_column is not None:
-            color_param = 'ColorBy'
-            if params['color_by']:
+            color_param = "ColorBy"
+            if params["color_by"]:
                 label_suffix = " (log10)" if color_log_applied else ""
-                color_labels = {'ColorBy': params['color_by'] + label_suffix}
+                color_labels = {"ColorBy": params["color_by"] + label_suffix}
             # Use continuous color scale for numeric data
             if color_column_is_numeric:
-                color_continuous_scale = 'Viridis'
+                color_continuous_scale = "Viridis"
 
         # Prepare hover data list for plots
         hover_data_list = list(hover_data.keys()) if hover_data else None
@@ -262,39 +322,39 @@ class UMAPTask(Task):
         # Create 2D visualization with px.scatter
         fig_2d = px.scatter(
             result_2d_df,
-            x='UMAP1',
-            y='UMAP2',
+            x="UMAP1",
+            y="UMAP2",
             color=color_param,
             color_continuous_scale=color_continuous_scale,
             hover_name=result_2d_df.index,
             hover_data=hover_data_list,
             labels=color_labels,
-            title="UMAP 2D Embedding"
+            title="UMAP 2D Embedding",
         )
 
-        fig_2d.update_traces(marker=dict(size=8))
-        fig_2d.update_layout(hovermode='closest')
+        fig_2d.update_traces(marker={"size": 8})
+        fig_2d.update_layout(hovermode="closest")
 
         # Create 3D visualization with px.scatter_3d
         fig_3d = px.scatter_3d(
             result_3d_df,
-            x='UMAP1',
-            y='UMAP2',
-            z='UMAP3',
+            x="UMAP1",
+            y="UMAP2",
+            z="UMAP3",
             color=color_param,
             color_continuous_scale=color_continuous_scale,
             hover_name=result_3d_df.index,
             hover_data=hover_data_list,
             labels=color_labels,
-            title="UMAP 3D Embedding"
+            title="UMAP 3D Embedding",
         )
 
-        fig_3d.update_traces(marker=dict(size=5))
-        fig_3d.update_layout(hovermode='closest')
+        fig_3d.update_traces(marker={"size": 5})
+        fig_3d.update_layout(hovermode="closest")
 
         return {
-            'umap_2d_plot': PlotlyResource(fig_2d),
-            'umap_3d_plot': PlotlyResource(fig_3d),
-            'umap_2d_table': Table(result_2d_df),
-            'umap_3d_table': Table(result_3d_df)
+            "umap_2d_plot": PlotlyResource(fig_2d),
+            "umap_3d_plot": PlotlyResource(fig_3d),
+            "umap_2d_table": Table(result_2d_df),
+            "umap_3d_table": Table(result_3d_df),
         }
