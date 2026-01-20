@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from gws_core import (
     BoolParam,
     ConfigParams,
@@ -125,9 +126,9 @@ class UMAPTask(Task):
                 short_description="Number of clusters for K-Means clustering (optional)",
                 optional=True,
             ),
-            "color_by": StrParam(
-                human_name="Color By Column",
-                short_description="Column name to color points by (optional)",
+            "color_by": ListParam(
+                human_name="Color By Columns",
+                short_description="Column names to use for colouring the points (optional). By default, all columns are used.",
                 optional=True,
             ),
             "columns_to_exclude": ListParam(
@@ -187,27 +188,15 @@ class UMAPTask(Task):
         # Preserve color column BEFORE excluding columns
         color_column = None
         color_column_is_numeric = False
-        color_log_applied = False
-        should_log_transform = False
-        if params["color_by"] and params["color_by"] in df.columns:
-            color_column = df[params["color_by"]].copy()
-            # Check if color column is numeric
-            color_column_is_numeric = pd.api.types.is_numeric_dtype(color_column)
-            if color_column_is_numeric:
-                # Calculate skewness to determine if log transform is beneficial
-                skewness = stats.skew(color_column.dropna())
-                # Common threshold: skewness > 2 indicates high positive skew
-                if skewness > 2:
-                    should_log_transform = True
-
-                # Apply log transformation if needed
-                if should_log_transform:
-                    # Add small constant to avoid log(0)
-                    min_positive = (
-                        color_column[color_column > 0].min() if (color_column > 0).any() else 1
-                    )
-                    color_column = np.log10(color_column + min_positive * 0.01)
-                    color_log_applied = True
+        if params["color_by"]:
+            list_columns_to_color_by = params["color_by"].copy()
+            for col in list_columns_to_color_by:
+                if col not in df.columns:
+                    list_columns_to_color_by = list_columns_to_color_by.remove(col)
+                    raise ValueError(f"Color by column '{col}' not found in data.")
+        else:
+            list_columns_to_color_by = df.columns.tolist()
+        df_color = df.copy()
 
         # Exclude specified columns
         columns_to_drop = []
@@ -286,71 +275,420 @@ class UMAPTask(Task):
             result_2d_df["Cluster"] = cluster_labels.astype(str)
             result_3d_df["Cluster"] = cluster_labels.astype(str)
 
-        # Add color column if provided
-        if color_column is not None:
+        # Add all color-by columns to result dataframes
+        for col in list_columns_to_color_by:
+            color_column = df_color[col].copy()
+            # Check if color column is numeric
+            color_column_is_numeric = pd.api.types.is_numeric_dtype(color_column)
+
             if color_column_is_numeric:
-                result_2d_df["ColorBy"] = color_column.values
-                result_3d_df["ColorBy"] = color_column.values
+                # Calculate skewness to determine if log transform is beneficial
+                skewness = stats.skew(color_column.dropna())
+                # Common threshold: skewness > 2 indicates high positive skew
+                if skewness > 2:
+                    # Add small constant to avoid log(0)
+                    min_positive = (
+                        color_column[color_column > 0].min() if (color_column > 0).any() else 1
+                    )
+                    color_column_transformed = np.log10(color_column + min_positive * 0.01)
+                    # Store both original and transformed
+                    result_2d_df[col] = df_color[col].values
+                    result_3d_df[col] = df_color[col].values
+                    result_2d_df[f"{col} (log10)"] = color_column_transformed.values
+                    result_3d_df[f"{col} (log10)"] = color_column_transformed.values
+                else:
+                    result_2d_df[col] = color_column.values
+                    result_3d_df[col] = color_column.values
             else:
-                result_2d_df["ColorBy"] = color_column.values.astype(str)
-                result_3d_df["ColorBy"] = color_column.values.astype(str)
+                result_2d_df[col] = color_column.values.astype(str)
+                result_3d_df[col] = color_column.values.astype(str)
 
         # Add hover data columns
         for col_name, col_data in hover_data.items():
             result_2d_df[col_name] = col_data.values
             result_3d_df[col_name] = col_data.values
 
-        # Determine color parameter and color scale
-        color_param = None
-        color_labels = {}
-        color_continuous_scale = None
-
-        if params["n_clusters"] is not None:
-            color_param = "Cluster"
-        elif color_column is not None:
-            color_param = "ColorBy"
-            if params["color_by"]:
-                label_suffix = " (log10)" if color_log_applied else ""
-                color_labels = {"ColorBy": params["color_by"] + label_suffix}
-            # Use continuous color scale for numeric data
-            if color_column_is_numeric:
-                color_continuous_scale = "Viridis"
-
         # Prepare hover data list for plots
-        hover_data_list = list(hover_data.keys()) if hover_data else None
+        hover_data_list = list(hover_data.keys()) if hover_data else []
 
-        # Create 2D visualization with px.scatter
-        fig_2d = px.scatter(
-            result_2d_df,
-            x="UMAP1",
-            y="UMAP2",
-            color=color_param,
-            color_continuous_scale=color_continuous_scale,
-            hover_name=result_2d_df.index,
-            hover_data=hover_data_list,
-            labels=color_labels,
-            title="UMAP 2D Embedding",
+        # Create traces and dropdown menus for color options
+        traces_2d = []
+        traces_3d = []
+        trace_groups_2d = {}
+        trace_groups_3d = {}
+
+        # Add cluster coloring option if clustering was performed
+        if params["n_clusters"] is not None:
+            cluster_traces_2d = []
+            cluster_traces_3d = []
+
+            for cluster in result_2d_df["Cluster"].unique():
+                cluster_mask = result_2d_df["Cluster"] == cluster
+
+                # 2D trace
+                hover_text = result_2d_df.index[cluster_mask].tolist()
+                hover_data_dict = {col: result_2d_df[col][cluster_mask] for col in hover_data_list}
+
+                # Build hover template with formatting
+                hover_template = "<b>%{hovertext}</b><br>"
+                if hover_data_list:
+                    for i, col in enumerate(hover_data_list):
+                        # Check if column is numeric
+                        if pd.api.types.is_numeric_dtype(result_2d_df[col]):
+                            hover_template += f"{col}: %{{customdata[{i}]:.2f}}<br>"
+                        else:
+                            hover_template += f"{col}: %{{customdata[{i}]}}<br>"
+                    hover_template = hover_template.rstrip("<br>") + "<extra></extra>"
+                else:
+                    hover_template = "<b>%{hovertext}</b><extra></extra>"
+
+                cluster_traces_2d.append(
+                    go.Scatter(
+                        x=result_2d_df.loc[cluster_mask, "UMAP1"],
+                        y=result_2d_df.loc[cluster_mask, "UMAP2"],
+                        mode="markers",
+                        marker={"size": 8},
+                        name=f"Cluster {cluster}",
+                        hovertext=hover_text,
+                        customdata=np.column_stack(
+                            [hover_data_dict[col] for col in hover_data_list]
+                        )
+                        if hover_data_list
+                        else None,
+                        hovertemplate=hover_template,
+                        visible=False,
+                    )
+                )
+
+                # 3D trace with same hover template logic
+                hover_template_3d = "<b>%{hovertext}</b><br>"
+                if hover_data_list:
+                    for i, col in enumerate(hover_data_list):
+                        if pd.api.types.is_numeric_dtype(result_3d_df[col]):
+                            hover_template_3d += f"{col}: %{{customdata[{i}]:.2f}}<br>"
+                        else:
+                            hover_template_3d += f"{col}: %{{customdata[{i}]}}<br>"
+                    hover_template_3d = hover_template_3d.rstrip("<br>") + "<extra></extra>"
+                else:
+                    hover_template_3d = "<b>%{hovertext}</b><extra></extra>"
+
+                cluster_traces_3d.append(
+                    go.Scatter3d(
+                        x=result_3d_df.loc[cluster_mask, "UMAP1"],
+                        y=result_3d_df.loc[cluster_mask, "UMAP2"],
+                        z=result_3d_df.loc[cluster_mask, "UMAP3"],
+                        mode="markers",
+                        marker={"size": 5},
+                        name=f"Cluster {cluster}",
+                        hovertext=hover_text,
+                        customdata=np.column_stack(
+                            [hover_data_dict[col] for col in hover_data_list]
+                        )
+                        if hover_data_list
+                        else None,
+                        hovertemplate=hover_template_3d,
+                        visible=False,
+                    )
+                )
+
+            trace_groups_2d["Cluster"] = cluster_traces_2d
+            trace_groups_3d["Cluster"] = cluster_traces_3d
+            traces_2d.extend(cluster_traces_2d)
+            traces_3d.extend(cluster_traces_3d)
+
+        # Add traces for each column in list_columns_to_color_by
+        for col in list_columns_to_color_by:
+            color_data = df_color[col].copy()
+            is_numeric = pd.api.types.is_numeric_dtype(color_data)
+
+            if is_numeric:
+                # Check if log transformation is beneficial
+                skewness = stats.skew(color_data.dropna())
+                apply_log = skewness > 2
+
+                if apply_log:
+                    min_positive = color_data[color_data > 0].min() if (color_data > 0).any() else 1
+                    color_data_transformed = np.log10(color_data + min_positive * 0.01)
+                    col_label = f"{col} (log10)"
+                else:
+                    color_data_transformed = color_data
+                    col_label = col
+
+                # Continuous coloring - single trace
+                hover_text = result_2d_df.index.tolist()
+
+                # Filter out hover data columns that match the color column
+                filtered_hover_list = [
+                    hcol for hcol in hover_data_list if hcol not in (col, col_label)
+                ]
+                hover_data_dict = {hcol: result_2d_df[hcol] for hcol in filtered_hover_list}
+
+                # Build hover template with formatting
+                hover_template = f"<b>%{{hovertext}}</b><br>{col_label}: %{{marker.color:.2f}}<br>"
+                if filtered_hover_list:
+                    for i, hcol in enumerate(filtered_hover_list):
+                        if pd.api.types.is_numeric_dtype(result_2d_df[hcol]):
+                            hover_template += f"{hcol}: %{{customdata[{i}]:.2f}}<br>"
+                        else:
+                            hover_template += f"{hcol}: %{{customdata[{i}]}}<br>"
+                    hover_template = hover_template.rstrip("<br>") + "<extra></extra>"
+                else:
+                    hover_template = f"<b>%{{hovertext}}</b><br>{col_label}: %{{marker.color:.2f}}<extra></extra>"
+
+                trace_2d = go.Scatter(
+                    x=result_2d_df["UMAP1"],
+                    y=result_2d_df["UMAP2"],
+                    mode="markers",
+                    marker={
+                        "size": 8,
+                        "color": color_data_transformed,
+                        "colorscale": "Viridis",
+                        "showscale": True,
+                        "colorbar": {"title": col_label},
+                    },
+                    name=col_label,
+                    hovertext=hover_text,
+                    customdata=np.column_stack(
+                        [hover_data_dict[hcol] for hcol in filtered_hover_list]
+                    )
+                    if filtered_hover_list
+                    else None,
+                    hovertemplate=hover_template,
+                    visible=False,
+                )
+
+                # 3D trace with same hover template logic
+                hover_data_dict_3d = {hcol: result_3d_df[hcol] for hcol in filtered_hover_list}
+
+                hover_template_3d = (
+                    f"<b>%{{hovertext}}</b><br>{col_label}: %{{marker.color:.2f}}<br>"
+                )
+                if filtered_hover_list:
+                    for i, hcol in enumerate(filtered_hover_list):
+                        if pd.api.types.is_numeric_dtype(result_3d_df[hcol]):
+                            hover_template_3d += f"{hcol}: %{{customdata[{i}]:.2f}}<br>"
+                        else:
+                            hover_template_3d += f"{hcol}: %{{customdata[{i}]}}<br>"
+                    hover_template_3d = hover_template_3d.rstrip("<br>") + "<extra></extra>"
+                else:
+                    hover_template_3d = f"<b>%{{hovertext}}</b><br>{col_label}: %{{marker.color:.2f}}<extra></extra>"
+
+                trace_3d = go.Scatter3d(
+                    x=result_3d_df["UMAP1"],
+                    y=result_3d_df["UMAP2"],
+                    z=result_3d_df["UMAP3"],
+                    mode="markers",
+                    marker={
+                        "size": 5,
+                        "color": color_data_transformed,
+                        "colorscale": "Viridis",
+                        "showscale": True,
+                        "colorbar": {"title": col_label},
+                    },
+                    name=col_label,
+                    hovertext=hover_text,
+                    customdata=np.column_stack(
+                        [hover_data_dict_3d[hcol] for hcol in filtered_hover_list]
+                    )
+                    if filtered_hover_list
+                    else None,
+                    hovertemplate=hover_template_3d,
+                    visible=False,
+                )
+
+                trace_groups_2d[col_label] = [trace_2d]
+                trace_groups_3d[col_label] = [trace_3d]
+                traces_2d.append(trace_2d)
+                traces_3d.append(trace_3d)
+            else:
+                # Categorical coloring - multiple traces
+                cat_traces_2d = []
+                cat_traces_3d = []
+
+                # Get unique categories and assign colors
+                unique_categories = color_data.unique()
+                colors = px.colors.qualitative.Plotly
+
+                for idx, category in enumerate(unique_categories):
+                    cat_mask = color_data == category
+                    hover_text = result_2d_df.index[cat_mask].tolist()
+
+                    # Filter out hover data columns that match the color column
+                    filtered_hover_list = [hcol for hcol in hover_data_list if hcol != col]
+                    hover_data_dict = {
+                        hcol: result_2d_df[hcol][cat_mask] for hcol in filtered_hover_list
+                    }
+
+                    color = colors[idx % len(colors)]
+
+                    # Build hover template with formatting
+                    hover_template = f"<b>%{{hovertext}}</b><br>{col}: {category}<br>"
+                    if filtered_hover_list:
+                        for i, hcol in enumerate(filtered_hover_list):
+                            if pd.api.types.is_numeric_dtype(result_2d_df[hcol]):
+                                hover_template += f"{hcol}: %{{customdata[{i}]:.2f}}<br>"
+                            else:
+                                hover_template += f"{hcol}: %{{customdata[{i}]}}<br>"
+                        hover_template = hover_template.rstrip("<br>") + "<extra></extra>"
+                    else:
+                        hover_template = (
+                            f"<b>%{{hovertext}}</b><br>{col}: {category}<extra></extra>"
+                        )
+
+                    cat_traces_2d.append(
+                        go.Scatter(
+                            x=result_2d_df.loc[cat_mask, "UMAP1"],
+                            y=result_2d_df.loc[cat_mask, "UMAP2"],
+                            mode="markers",
+                            marker={"size": 8, "color": color},
+                            name=str(category),
+                            hovertext=hover_text,
+                            customdata=np.column_stack(
+                                [hover_data_dict[hcol] for hcol in filtered_hover_list]
+                            )
+                            if filtered_hover_list
+                            else None,
+                            hovertemplate=hover_template,
+                            visible=False,
+                        )
+                    )
+
+                    # 3D trace with same hover template logic
+                    hover_data_dict_3d = {
+                        hcol: result_3d_df[hcol][cat_mask] for hcol in filtered_hover_list
+                    }
+
+                    hover_template_3d = f"<b>%{{hovertext}}</b><br>{col}: {category}<br>"
+                    if filtered_hover_list:
+                        for i, hcol in enumerate(filtered_hover_list):
+                            if pd.api.types.is_numeric_dtype(result_3d_df[hcol]):
+                                hover_template_3d += f"{hcol}: %{{customdata[{i}]:.2f}}<br>"
+                            else:
+                                hover_template_3d += f"{hcol}: %{{customdata[{i}]}}<br>"
+                        hover_template_3d = hover_template_3d.rstrip("<br>") + "<extra></extra>"
+                    else:
+                        hover_template_3d = (
+                            f"<b>%{{hovertext}}</b><br>{col}: {category}<extra></extra>"
+                        )
+
+                    cat_traces_3d.append(
+                        go.Scatter3d(
+                            x=result_3d_df.loc[cat_mask, "UMAP1"],
+                            y=result_3d_df.loc[cat_mask, "UMAP2"],
+                            z=result_3d_df.loc[cat_mask, "UMAP3"],
+                            mode="markers",
+                            marker={"size": 5, "color": color},
+                            name=str(category),
+                            hovertext=hover_text,
+                            customdata=np.column_stack(
+                                [hover_data_dict_3d[hcol] for hcol in filtered_hover_list]
+                            )
+                            if filtered_hover_list
+                            else None,
+                            hovertemplate=hover_template_3d,
+                            visible=False,
+                        )
+                    )
+
+                trace_groups_2d[col] = cat_traces_2d
+                trace_groups_3d[col] = cat_traces_3d
+                traces_2d.extend(cat_traces_2d)
+                traces_3d.extend(cat_traces_3d)
+
+        # Create dropdown buttons for 2D
+        buttons_2d = []
+        for label, group in trace_groups_2d.items():
+            visibility = [False] * len(traces_2d)
+            for t in group:
+                visibility[traces_2d.index(t)] = True
+
+            buttons_2d.append(
+                {
+                    "label": label,
+                    "method": "update",
+                    "args": [
+                        {"visible": visibility},
+                        {"title": f"UMAP 2D Embedding – Color by {label}"},
+                    ],
+                }
+            )
+
+        # Create dropdown buttons for 3D
+        buttons_3d = []
+        for label, group in trace_groups_3d.items():
+            visibility = [False] * len(traces_3d)
+            for t in group:
+                visibility[traces_3d.index(t)] = True
+
+            buttons_3d.append(
+                {
+                    "label": label,
+                    "method": "update",
+                    "args": [
+                        {"visible": visibility},
+                        {"title": f"UMAP 3D Embedding – Color by {label}"},
+                    ],
+                }
+            )
+
+        # Set first trace group as visible for 2D
+        if trace_groups_2d:
+            first_group_2d = list(trace_groups_2d.values())[0]
+            for trace in first_group_2d:
+                trace.visible = True
+
+        # Set first trace group as visible for 3D
+        if trace_groups_3d:
+            first_group_3d = list(trace_groups_3d.values())[0]
+            for trace in first_group_3d:
+                trace.visible = True
+
+        # Create 2D figure
+        fig_2d = go.Figure(traces_2d)
+
+        first_label_2d = list(trace_groups_2d.keys())[0] if trace_groups_2d else "UMAP"
+        fig_2d.update_layout(
+            title=f"UMAP 2D Embedding – Color by {first_label_2d}",
+            updatemenus=[
+                {
+                    "buttons": buttons_2d,
+                    "direction": "down",
+                    "showactive": True,
+                    "x": 1.02,
+                    "y": 1,
+                }
+            ]
+            if len(buttons_2d) > 1
+            else [],
+            xaxis_title="UMAP 1",
+            yaxis_title="UMAP 2",
+            hovermode="closest",
         )
 
-        fig_2d.update_traces(marker={"size": 8})
-        fig_2d.update_layout(hovermode="closest")
+        # Create 3D figure
+        fig_3d = go.Figure(traces_3d)
 
-        # Create 3D visualization with px.scatter_3d
-        fig_3d = px.scatter_3d(
-            result_3d_df,
-            x="UMAP1",
-            y="UMAP2",
-            z="UMAP3",
-            color=color_param,
-            color_continuous_scale=color_continuous_scale,
-            hover_name=result_3d_df.index,
-            hover_data=hover_data_list,
-            labels=color_labels,
-            title="UMAP 3D Embedding",
+        first_label_3d = list(trace_groups_3d.keys())[0] if trace_groups_3d else "UMAP"
+        fig_3d.update_layout(
+            title=f"UMAP 3D Embedding – Color by {first_label_3d}",
+            updatemenus=[
+                {
+                    "buttons": buttons_3d,
+                    "direction": "down",
+                    "showactive": True,
+                    "x": 1.02,
+                    "y": 1,
+                }
+            ]
+            if len(buttons_3d) > 1
+            else [],
+            scene={
+                "xaxis_title": "UMAP 1",
+                "yaxis_title": "UMAP 2",
+                "zaxis_title": "UMAP 3",
+            },
+            hovermode="closest",
         )
-
-        fig_3d.update_traces(marker={"size": 5})
-        fig_3d.update_layout(hovermode="closest")
 
         return {
             "umap_2d_plot": PlotlyResource(fig_2d),
