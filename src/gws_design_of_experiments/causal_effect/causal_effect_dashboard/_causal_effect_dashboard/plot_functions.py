@@ -2,10 +2,9 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import streamlit as st
-from gws_design_of_experiments.causal_effect.causal_effect_dashboard._causal_effect_dashboard.causal_effect_state import (
-    CausalEffectState,
-)
 from gws_design_of_experiments.causal_effect.causal_effect_task import CausalEffect
+
+from .causal_effect_state import CausalEffectState
 
 
 def display_barplot(
@@ -93,10 +92,12 @@ def display_barplot(
     df_display[f"{CausalEffect.TARGET_NAME}_Combo_Display"] = df_display[
         f"{CausalEffect.TARGET_NAME}_Combo"
     ].apply(
-        lambda x: CausalEffectState.get_display_name(x.split(" [")[0])
-        + " ["
-        + CausalEffectState.get_display_name(x.split(" [")[1].rstrip("]"))
-        + "]"
+        lambda x: (
+            CausalEffectState.get_display_name(x.split(" [")[0])
+            + " ["
+            + CausalEffectState.get_display_name(x.split(" [")[1].rstrip("]"))
+            + "]"
+        )
     )
 
     fig = px.bar(

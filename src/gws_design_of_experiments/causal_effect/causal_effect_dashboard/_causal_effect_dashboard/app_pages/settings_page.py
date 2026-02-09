@@ -2,9 +2,8 @@ import json
 import os
 
 import streamlit as st
-from gws_design_of_experiments.causal_effect.causal_effect_dashboard._causal_effect_dashboard.causal_effect_state import (
-    CausalEffectState,
-)
+
+from ..causal_effect_state import CausalEffectState
 
 
 def render_settings_page():

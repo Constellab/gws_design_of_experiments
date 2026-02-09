@@ -3,32 +3,39 @@ import os
 import numpy as np
 import pandas as pd
 import streamlit as st
-from gws_core.streamlit import StreamlitRouter
-from gws_design_of_experiments.causal_effect.causal_effect_dashboard._causal_effect_dashboard.causal_effect_state import (
-    CausalEffectState,
-)
-from gws_design_of_experiments.causal_effect.causal_effect_dashboard._causal_effect_dashboard.pages import (
+from gws_streamlit_main import StreamlitMainState, StreamlitRouter
+
+# Initialize GWS - MUST be at the top
+StreamlitMainState.initialize()
+
+from gws_design_of_experiments.causal_effect.causal_effect_dashboard._causal_effect_dashboard.app_pages import (
     multiple_effect_page,
     settings_page,
     single_effect_page,
 )
+from gws_design_of_experiments.causal_effect.causal_effect_dashboard._causal_effect_dashboard.causal_effect_state import (
+    CausalEffectState,
+)
 from gws_design_of_experiments.causal_effect.causal_effect_task import CausalEffect
 
-sources: list
-params: dict
+sources = StreamlitMainState.get_sources()
+params = StreamlitMainState.get_params()
 
 # Uncomment if you want to hide the Streamlit sidebar toggle and always show the sidebar
-# from gws_core.streamlit import StreamlitHelper
+# from gws_streamlit_main import StreamlitHelper
 # StreamlitHelper.hide_sidebar_toggle()
 
 
 # Pages
 
+
 def _render_single_effect_page():
     single_effect_page.render_single_effect_page()
 
+
 def _render_multiple_effect_page():
     multiple_effect_page.render_multiple_effect_page()
+
 
 def _render_settings_page():
     settings_page.render_settings_page()
@@ -45,7 +52,9 @@ def load_data(folder_path: str) -> pd.DataFrame:
                 combinaison = os.path.basename(root)
                 df = pd.read_csv(path)
                 df["Combinaison"] = combinaison
-                df[f"{CausalEffect.TARGET_NAME}_Combo"] = df[CausalEffect.TARGET_NAME].astype(str) + " [" + combinaison + "]"
+                df[f"{CausalEffect.TARGET_NAME}_Combo"] = (
+                    df[CausalEffect.TARGET_NAME].astype(str) + " [" + combinaison + "]"
+                )
                 all_results.append(df)
 
     if all_results:
@@ -60,27 +69,40 @@ def show_sidebar():
         combinaisons = sorted(df_all["Combinaison"].unique())
         # Map combinations to display names
         display_combinaisons = [CausalEffectState.get_display_name(combo) for combo in combinaisons]
-        selected_display = st.selectbox("Combinations of targets", options=display_combinaisons, index=0, key="combinations_selectbox_display")
+        selected_display = st.selectbox(
+            "Combinations of targets",
+            options=display_combinaisons,
+            index=0,
+            key="combinations_selectbox_display",
+        )
         # Find the original combination name
-        selected_combo = combinaisons[display_combinaisons.index(selected_display)] if selected_display in display_combinaisons else combinaisons[0]
+        selected_combo = (
+            combinaisons[display_combinaisons.index(selected_display)]
+            if selected_display in display_combinaisons
+            else combinaisons[0]
+        )
         st.session_state["combinations_selectbox"] = selected_combo
 
     # 2. Traitements - auto-désélection de ceux à 0
-    df_temp = df_all[df_all["Combinaison"]== CausalEffectState.get_combinations()]
-    traitement_stats = df_temp.groupby(CausalEffect.TREATMENT_NAME)[CausalEffect.AVERAGE_CAUSAL_EFFECT_NAME].apply(lambda x: (x != 0).any())
+    df_temp = df_all[df_all["Combinaison"] == CausalEffectState.get_combinations()]
+    traitement_stats = df_temp.groupby(CausalEffect.TREATMENT_NAME)[
+        CausalEffect.AVERAGE_CAUSAL_EFFECT_NAME
+    ].apply(lambda x: (x != 0).any())
     traitements_valides = sorted(traitement_stats[traitement_stats].index.tolist())
 
     # Filtrage selon combinaison + traitement
     df_filtre = df_all[
-        (df_all["Combinaison"]== CausalEffectState.get_combinations()) &
-        (df_all[CausalEffect.TREATMENT_NAME].isin(traitements_valides))
+        (df_all["Combinaison"] == CausalEffectState.get_combinations())
+        & (df_all[CausalEffect.TREATMENT_NAME].isin(traitements_valides))
     ]
 
     # 3. Targets
     cibles_combo = sorted(df_filtre[f"{CausalEffect.TARGET_NAME}_Combo"].unique())
 
     df_filtre = df_filtre[df_filtre[f"{CausalEffect.TARGET_NAME}_Combo"].isin(cibles_combo)]
-    df_filtre[CausalEffect.AVERAGE_CAUSAL_EFFECT_NAME] = np.sign(df_filtre[CausalEffect.AVERAGE_CAUSAL_EFFECT_NAME]) * np.log10(1 + np.abs(df_filtre[CausalEffect.AVERAGE_CAUSAL_EFFECT_NAME]))
+    df_filtre[CausalEffect.AVERAGE_CAUSAL_EFFECT_NAME] = np.sign(
+        df_filtre[CausalEffect.AVERAGE_CAUSAL_EFFECT_NAME]
+    ) * np.log10(1 + np.abs(df_filtre[CausalEffect.AVERAGE_CAUSAL_EFFECT_NAME]))
     if df_filtre.empty:
         st.warning("No data to display.")
         return
@@ -101,17 +123,24 @@ if sources:
 
     # Check if current combination has multiple targets
     if CausalEffectState.is_multi_target_combination(CausalEffectState.get_combinations()):
-        _multiple_effect_page = st.Page(_render_multiple_effect_page, title='Multiple effect', url_path='multiple-effect-page', icon='📊')
-        pages['Multiple effect'] = [_multiple_effect_page]
+        _multiple_effect_page = st.Page(
+            _render_multiple_effect_page,
+            title="Multiple effect",
+            url_path="multiple-effect-page",
+            icon="📊",
+        )
+        pages["Multiple effect"] = [_multiple_effect_page]
     else:
-        _single_effect_page = st.Page(_render_single_effect_page, title='Single effect', url_path='single-effect-page', icon='📈')
-        pages['Single effect'] = [_single_effect_page]
+        _single_effect_page = st.Page(
+            _render_single_effect_page,
+            title="Single effect",
+            url_path="single-effect-page",
+            icon="📈",
+        )
+        pages["Single effect"] = [_single_effect_page]
 
-
-    _settings_page = st.Page(_render_settings_page, title='Settings', url_path='settings', icon='⚙️')
-    pages['Settings'] = [_settings_page]
+    _settings_page = st.Page(_render_settings_page, title="Settings", url_path="settings", icon="⚙️")
+    pages["Settings"] = [_settings_page]
 
     pg = st.navigation(pages)
     pg.run()
-
-
