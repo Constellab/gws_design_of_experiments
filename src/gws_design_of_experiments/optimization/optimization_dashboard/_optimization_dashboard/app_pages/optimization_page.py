@@ -80,7 +80,7 @@ def render_first_page(path_output_dir: str):
             if selected_params and selected_params in df.columns:
                 fig = px.box(df, y=selected_params, title=f"Distribution of {selected_params}")
                 fig.update_layout(height=400, margin={"l": 0, "r": 0, "t": 30, "b": 0})
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
 
     # -----------------------------------------------------------------------------
     # --- 3D Surface Explorer ------------------------------------------------------
@@ -128,7 +128,7 @@ def render_first_page(path_output_dir: str):
             scene={"xaxis_title": x_col, "yaxis_title": y_col, "zaxis_title": z_col},
             margin={"l": 0, "r": 0, "b": 0, "t": 40},
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
         with st.expander("View data", expanded=False):
             st.dataframe(df[[x_col, y_col, z_col]])
@@ -174,7 +174,7 @@ def render_first_page(path_output_dir: str):
             yaxis_title="Predicted",
             margin={"l": 0, "r": 0, "t": 40, "b": 0},
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     # -----------------------------------------------------------------------------
     # --- Feature Importance Matrix -----------------------------------------------
@@ -202,7 +202,7 @@ def render_first_page(path_output_dir: str):
                 sorted_df.columns = ["Feature", "Importance"]
                 fig = px.bar(sorted_df, x="Feature", y="Importance", title=target)
                 fig.update_layout(xaxis_tickangle=-45)
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
         else:
             st.write("### Combined importance")
             fig = go.Figure()
@@ -215,7 +215,7 @@ def render_first_page(path_output_dir: str):
                 margin={"l": 0, "r": 0, "t": 40, "b": 0},
                 xaxis_tickangle=-45,
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
     # -----------------------------------------------------------------------------
     # --- Data Explorer --------------------------------------------------

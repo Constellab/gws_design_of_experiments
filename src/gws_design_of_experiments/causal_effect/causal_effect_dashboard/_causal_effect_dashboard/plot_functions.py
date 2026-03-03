@@ -22,15 +22,18 @@ def display_barplot(
             if len(negative_values) > 0:
                 min_negative = negative_values.min()
                 max_negative = negative_values.max()
-                step_negative = (min_negative - max_negative) / 100
-                negative_threshold = st.slider(
-                    "Negative effects threshold",
-                    min_value=min_negative,
-                    max_value=max_negative,
-                    value=(min_negative, max_negative),
-                    step=step_negative,
-                    key="negative_threshold",
-                )
+                if min_negative == max_negative:
+                    negative_threshold = (min_negative, max_negative)
+                else:
+                    step_negative = (min_negative - max_negative) / 100
+                    negative_threshold = st.slider(
+                        "Negative effects threshold",
+                        min_value=min_negative,
+                        max_value=max_negative,
+                        value=(min_negative, max_negative),
+                        step=step_negative,
+                        key="negative_threshold",
+                    )
             else:
                 negative_threshold = (0.0, 0.0)
                 st.write("No negative values found")
@@ -39,15 +42,18 @@ def display_barplot(
             if len(positive_values) > 0:
                 min_positive = positive_values.min()
                 max_positive = positive_values.max()
-                step_positive = (max_positive - min_positive) / 100
-                positive_threshold = st.slider(
-                    "Positive effects threshold",
-                    min_value=min_positive,
-                    max_value=max_positive,
-                    value=(min_positive, max_positive),
-                    step=step_positive,
-                    key="positive_threshold",
-                )
+                if min_positive == max_positive:
+                    positive_threshold = (min_positive, max_positive)
+                else:
+                    step_positive = (max_positive - min_positive) / 100
+                    positive_threshold = st.slider(
+                        "Positive effects threshold",
+                        min_value=min_positive,
+                        max_value=max_positive,
+                        value=(min_positive, max_positive),
+                        step=step_positive,
+                        key="positive_threshold",
+                    )
             else:
                 positive_threshold = (0.0, 0.0)
                 st.write("No positive values found")
@@ -115,4 +121,4 @@ def display_barplot(
     )
 
     fig.update_layout(xaxis_tickangle=-45)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
