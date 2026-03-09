@@ -1,7 +1,7 @@
 {
     "name": "gws_design_of_experiments",
     "author": "Gencovery",
-    "version": "0.1.8",
+    "version": "0.1.9",
     "variables": {
         "testdata_dir": "${CURRENT_DIR}/tests/testdata"
     },
