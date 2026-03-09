@@ -19,10 +19,6 @@
                     {
                         "name": "seaborn",
                         "version": "0.13.2"
-                    },
-                    {
-                        "name": "umap-learn",
-                        "version": "0.5.9.post2"
                     }
                 ]
             }

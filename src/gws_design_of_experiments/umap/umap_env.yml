@@ -1,0 +1,15 @@
+name: .venv
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - libgcc-ng>=12.0.0
+  - libstdcxx-ng>=12.0.0
+  - libgomp
+  - scikit-learn
+  - numpy
+  - pandas
+  - scipy
+  - pip
+  - pip:
+    - umap-learn==0.5.9.post2

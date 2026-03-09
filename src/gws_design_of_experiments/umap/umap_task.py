@@ -1,3 +1,6 @@
+import os
+import pickle
+
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -11,6 +14,7 @@ from gws_core import (
     InputSpecs,
     IntParam,
     ListParam,
+    MambaShellProxy,
     OutputSpec,
     OutputSpecs,
     PlotlyResource,
@@ -23,9 +27,8 @@ from gws_core import (
     task_decorator,
 )
 from scipy import stats
-from sklearn.cluster import KMeans
-from sklearn.preprocessing import StandardScaler
-from umap import UMAP
+
+from .umap_env_helper import UMAPEnvHelper
 
 
 @task_decorator(
@@ -222,39 +225,41 @@ class UMAPTask(Task):
         # Store original index
         original_index = x.index
 
-        # Scaling if requested
-        if params["scale_data"]:
-            scaler = StandardScaler()
-            x_scaled = scaler.fit_transform(x)
-        else:
-            x_scaled = x.values
+        # Run UMAP in virtual environment
+        shell_proxy: MambaShellProxy = UMAPEnvHelper.create_proxy(self.message_dispatcher)
 
-        # Apply UMAP for 2D
-        reducer_2d = UMAP(
-            n_components=2,
-            n_neighbors=params["n_neighbors"],
-            min_dist=params["min_dist"],
-            random_state=42,
-            metric=params["metric"],
-        )
-        embedding_2d = reducer_2d.fit_transform(x_scaled)
+        input_data = {
+            "x_values": x.values,
+            "n_neighbors": params["n_neighbors"],
+            "min_dist": params["min_dist"],
+            "metric": params["metric"],
+            "scale_data": params["scale_data"],
+            "n_clusters": params["n_clusters"],
+        }
 
-        # Apply UMAP for 3D
-        reducer_3d = UMAP(
-            n_components=3,
-            n_neighbors=params["n_neighbors"],
-            min_dist=params["min_dist"],
-            random_state=42,
-            metric=params["metric"],
-        )
-        embedding_3d = reducer_3d.fit_transform(x_scaled)
+        input_file = os.path.join(shell_proxy.working_dir, "umap_input.pkl")
+        output_file = os.path.join(shell_proxy.working_dir, "umap_output.pkl")
 
-        embedding_2d = np.asarray(
-            embedding_2d[0] if isinstance(embedding_2d, tuple) else embedding_2d
-        )
-        embedding_3d = np.asarray(
-            embedding_3d[0] if isinstance(embedding_3d, tuple) else embedding_3d
-        )
+        self.log_info_message("Saving input data for UMAP virtual environment")
+        with open(input_file, "wb") as f:
+            pickle.dump(input_data, f)
+
+        script_path = os.path.join(os.path.dirname(__file__), "_run_umap.py")
+
+        self.log_info_message("Running UMAP in virtual environment")
+        cmd = ["python", script_path, input_file, output_file]
+        result_code = shell_proxy.run(cmd, dispatch_stdout=True, dispatch_stderr=True)
+
+        if result_code != 0:
+            raise Exception("UMAP computation failed in virtual environment")
+
+        # Load results from virtual environment
+        with open(output_file, "rb") as f:
+            output_data = pickle.load(f)
+
+        embedding_2d = output_data["embedding_2d"]
+        embedding_3d = output_data["embedding_3d"]
+        cluster_labels = output_data["cluster_labels"]
 
         # Create 2D result dataframe
         result_2d_df = pd.DataFrame(
@@ -267,11 +272,8 @@ class UMAPTask(Task):
             index=original_index,
         )
 
-        # Perform clustering if requested (on 2D embedding)
-        cluster_labels = None
-        if params["n_clusters"] is not None:
-            kmeans = KMeans(n_clusters=params["n_clusters"], random_state=42)
-            cluster_labels = kmeans.fit_predict(embedding_2d)
+        # Add clustering results if available
+        if cluster_labels is not None:
             result_2d_df["Cluster"] = cluster_labels.astype(str)
             result_3d_df["Cluster"] = cluster_labels.astype(str)
 
