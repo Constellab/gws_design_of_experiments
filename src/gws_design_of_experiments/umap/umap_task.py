@@ -18,7 +18,7 @@ from gws_core import (
     OutputSpec,
     OutputSpecs,
     PlotlyResource,
-    StrParam,
+    SelectParam,
     Table,
     Task,
     TaskInputs,
@@ -112,9 +112,9 @@ class UMAPTask(Task):
                 human_name="Minimum Distance",
                 short_description="Minimum distance between points in the embedding",
             ),
-            "metric": StrParam(
+            "metric": SelectParam(
                 default_value="euclidean",
-                allowed_values=METRICS_OPTION,
+                options=METRICS_OPTION,
                 human_name="Distance Metric",
                 short_description="Distance metric to use (euclidean, manhattan, cosine, etc.)",
             ),
