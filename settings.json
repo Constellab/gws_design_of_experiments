@@ -1,7 +1,7 @@
 {
     "name": "gws_design_of_experiments",
     "author": "Gencovery",
-    "version": "0.1.9",
+    "version": "0.1.10",
     "variables": {
         "testdata_dir": "${CURRENT_DIR}/tests/testdata"
     },
@@ -9,7 +9,7 @@
         "bricks": [
             {
                 "name": "gws_core",
-                "version": "0.20.0"
+                "version": "0.22.1"
             }
         ],
         "pip": [
