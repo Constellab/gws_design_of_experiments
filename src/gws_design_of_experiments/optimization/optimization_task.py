@@ -115,7 +115,7 @@ class Optimization(Task):
                         ),
                     }
                 ),
-                optional=False,
+                min_number_of_occurrences=0,
                 human_name="Targets with objectives",
                 short_description="Targets to optimize and their objective values",
             ),
