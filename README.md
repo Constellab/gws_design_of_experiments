@@ -18,11 +18,12 @@
 
 ## ✅ Features
 
-Gencovery brick to build, contextualize and simulate genome-scale metabolic models (GEMs) in Constellab, as a thin wrapper around the [cobrapy](https://github.com/opencobra/cobrapy) toolbox.
-- Import a genome-scale metabolic model from a standard COBRA JSON file, or download one directly from the [BiGG Models](http://bigg.ucsd.edu) database
-- Contextualize a model with reaction bound constraints (growth medium, gene/reaction knockouts, measured flux ranges) and soft flux targets
-- Simulate a model with flux balance analysis (FBA), with an optional relaxed (quadratic) solver for partially curated models where a strict steady-state constraint would make the simulation infeasible
-- Reconstruct a draft model from an organism's NCBI taxonomy id, using curated reactions from the `gws_biota` database
+Gencovery brick providing Constellab tasks for design of experiments (DoE) and exploratory data analysis, covering regression, dimensionality reduction, causal inference, and multi-objective optimization on tabular data.
+- **PLS Regression**: Partial Least Squares regression with automatic component selection via cross-validation, VIP scores for feature importance, and diagnostic plots (train/test predictions, CV performance)
+- **Random Forest Regressor**: Random Forest regression with automatic hyperparameter tuning (n_estimators, max_depth), feature importance ranking, and diagnostic plots
+- **UMAP Dimensionality Reduction**: Reduces high-dimensional data to 2D/3D for visualization, with optional K-Means clustering and interactive Plotly plots colorable by any column
+- **Causal Effect**: Estimates causal effects (Average Treatment Effect) of treatment variables on target variables using DML methods (LinearDML for discrete treatments, CausalForestDML for continuous treatments), with heatmap visualizations
+- **Optimization**: Multi-objective optimization (NSGA-II/GA) over experimental data, training and selecting the best of several ML models (Random Forest, XGBoost, CatBoost) to search for optimal feature settings under user-defined constraints and thresholds
 
 ## 📄Documentation
 
